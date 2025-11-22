@@ -7,7 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 
 // register our task service as singleton for now
-builder.Services.AddSingleton<ITaskService, InMemoryTaskService>();
+builder.Services.AddSingleton<ITaskService, InMemoryTaskService>(); // dependency injection
 
 var app = builder.Build();
 
@@ -19,7 +19,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// map our endpoints
+// Map endpoints
 app.MapHealthEndpoints();
 app.MapTaskEndpoints(); // currently empty but ready
 
