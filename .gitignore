@@ -1,0 +1,46 @@
+# Ignore build output folders
+bin/
+obj/
+
+# Ignore Visual Studio files
+.vs/
+.vscode/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.userprefs
+
+# Backup & temporary files
+*.tmp
+*.bak
+*.ncb
+*.log
+*.tlog
+*.cache
+*.pdb
+
+# Build artifacts
+*.dll
+*.exe
+*.app
+*.pyc
+
+# ASP.NET specific
+appsettings.Development.json
+
+# NuGet Packages
+*.nupkg
+packages/
+
+# dotnet watcher temp
+*.vscode/.ionide
+.idea/
+
+# Environment variables
+.env
+
+# JetBrains Rider (optional)
+.idea/
+*.sln.iml
