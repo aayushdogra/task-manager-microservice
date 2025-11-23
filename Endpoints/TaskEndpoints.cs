@@ -10,8 +10,6 @@ public static class TaskEndpoints
 {
     public static IEndpointRouteBuilder MapTaskEndpoints(this IEndpointRouteBuilder app)
     {
-        // Example structure:
-
         // GET /tasks - list all tasks
         app.MapGet("/tasks", (ITaskService tasks) =>
         {
@@ -20,7 +18,7 @@ public static class TaskEndpoints
         })
         .WithName("GetTasks");
 
-        // GET /tasks/{id} - get one task
+        // GET /tasks/{id} - get single task by id
         app.MapGet("/tasks/{id:int}", (int id, ITaskService tasks) =>
         {
             var task = tasks.GetById(id);
@@ -28,7 +26,7 @@ public static class TaskEndpoints
         })
         .WithName("GetTaskById");
 
-        // POST /tasks - create
+        // POST /tasks - create new task
         app.MapPost("/tasks", (CreateTaskRequest request, ITaskService tasks) =>
         {
             if (string.IsNullOrWhiteSpace(request.Title))
@@ -42,5 +40,6 @@ public static class TaskEndpoints
         return app;
     }
 
+    // DTO for creating a tasks
     public record CreateTaskRequest(string Title, string? Description);
 }
