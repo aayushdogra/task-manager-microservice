@@ -68,6 +68,7 @@ TaskManager/
 │   ├── ITaskService.cs
 │   └── InMemoryTaskService.cs
 ├── Data/
-│   └── README.md
+│   └── (data files later)
+├── README.md
 └── TaskManager.csproj
 ```
