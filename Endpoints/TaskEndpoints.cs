@@ -37,9 +37,21 @@ public static class TaskEndpoints
         })
         .WithName("CreateTask");
 
+        // PUT /tasks/{id} - update existing task
+        app.MapPut("/tasks/{id:int}", async (int id, UpdateTaskRequest request, ITaskService tasks) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Title))
+                return Results.BadRequest(new { error = "Title is required" });
+
+            var updated = tasks.Update(id, request.Title, request.Description, request.IsCompleted);
+            return updated is not null ? Results.Ok(updated) : Results.NotFound();
+        })
+            .WithName("UpdateTask");
+
         return app;
     }
 
     // DTO for creating a tasks
     public record CreateTaskRequest(string Title, string? Description);
+    public record UpdateTaskRequest(string Title, string? Description, bool IsCompleted);
 }
