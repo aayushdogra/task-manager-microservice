@@ -46,7 +46,15 @@ public static class TaskEndpoints
             var updated = tasks.Update(id, request.Title, request.Description, request.IsCompleted);
             return updated is not null ? Results.Ok(updated) : Results.NotFound();
         })
-            .WithName("UpdateTask");
+        .WithName("UpdateTask");
+
+        // DEL /tasks/{id} - delete task by id
+        app.MapDelete("/tasks/{id:int}", (int id, ITaskService tasks) =>
+        {
+            var deleted = tasks.Delete(id);
+            return deleted ? Results.NoContent() : Results.NotFound();
+        })
+        .WithName("DeleteTask");
 
         return app;
     }
