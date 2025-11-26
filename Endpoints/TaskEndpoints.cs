@@ -48,7 +48,7 @@ public static class TaskEndpoints
         })
         .WithName("UpdateTask");
 
-        // DEL /tasks/{id} - delete task by id
+        // DELETE /tasks/{id} - delete task by id
         app.MapDelete("/tasks/{id:int}", (int id, ITaskService tasks) =>
         {
             var deleted = tasks.Delete(id);
