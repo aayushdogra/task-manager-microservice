@@ -11,9 +11,14 @@ public static class TaskEndpoints
     public static IEndpointRouteBuilder MapTaskEndpoints(this IEndpointRouteBuilder app)
     {
         // GET /tasks - list all tasks
-        app.MapGet("/tasks", (ITaskService tasks) =>
+        // Filter by isCompleted if query parameter is provided
+        app.MapGet("/tasks", (bool? isCompleted, ITaskService tasks) =>
         {
             var all = tasks.GetAll();
+
+            if (isCompleted.HasValue)
+                all = all.Where(t => t.IsCompleted == isCompleted.Value);
+
             return Results.Ok(all);
         })
         .WithName("GetTasks");
