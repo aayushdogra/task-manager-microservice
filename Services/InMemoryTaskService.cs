@@ -13,7 +13,9 @@ public class InMemoryTaskService : ITaskService
 
     public TaskItem Create(string title, string? description)
     {
-        var task = new TaskItem(_nextId++, title, description, false);
+        var now = DateTime.UtcNow;
+
+        var task = new TaskItem(_nextId++, title, description, false, now, now);
         _tasks.Add(task);
         return task;
     }
@@ -23,7 +25,14 @@ public class InMemoryTaskService : ITaskService
         var existing = _tasks.FirstOrDefault(t => t.Id == id);
         if (existing is null) return null;
 
-        var updated = existing with { Title = title, Description = description, IsCompleted = isCompleted };
+        var updated = existing with 
+        { 
+            Title = title, 
+            Description = description, 
+            IsCompleted = isCompleted,
+            UpdatedAt = DateTime.UtcNow
+        };
+
         _tasks[_tasks.IndexOf(existing)] = updated;
         return updated;
     }

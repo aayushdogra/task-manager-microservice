@@ -1,10 +1,17 @@
+using TaskManager.Data;
 using TaskManager.Endpoints;
 using TaskManager.Services;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddOpenApi();
+
+var connectionString = builder.Configuration.GetConnectionString("TasksDb")
+                       ?? "Host=localhost;Port=5432;Database=tasks_db;Username=postgres;Password=postgres";
+
+builder.Services.AddDbContext<TasksDbContext>(options => options.UseNpgsql(connectionString));
 
 // register our task service as singleton for now
 builder.Services.AddSingleton<ITaskService, InMemoryTaskService>(); // dependency injection

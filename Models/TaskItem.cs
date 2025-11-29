@@ -4,5 +4,7 @@ public record TaskItem(
     int Id,
     string Title,
     string? Description,
-    bool IsCompleted
+    bool IsCompleted,
+    DateTime CreatedAt,
+    DateTime UpdatedAt
 );
