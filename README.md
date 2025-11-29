@@ -32,15 +32,16 @@ Used for rapid local development.
 
 `Data/` will later include:
 
-- EF Core DbContext
-- Migrations
-- SQL schema
+- EF Core packages installed
+- `TasksDbContext` added
+- Initial SQL schema defined in `Data/TasksTable.sql`
+- PostgreSQL integration planned (via Docker)
 
 ### ✔ Health check endpoint
 
 `/health` → returns status for uptime monitoring.
 
-### ✔ Task CRUD operations (upcoming)
+### ✔ Full Task CRUD (Completed)
 
 - `GET /tasks`
 - `GET /tasks/{id}`
@@ -51,6 +52,15 @@ Used for rapid local development.
 ### ✔ Docker-ready project (planned)
 
 Will include a `Dockerfile` + `docker-compose.yml`.
+
+---
+
+## 📅 Next Milestone (WIP)
+
+- Connect PostgreSQL using EF Core
+- Implement DbTaskService with real persistence
+- Add CreatedAt / UpdatedAt timestamps
+- Add Docker support
 
 ---
 
