@@ -30,8 +30,6 @@ Used for rapid local development.
 
 ### ✔ Ready for real database (SQL) integration
 
-`Data/` will later include:
-
 - EF Core packages installed
 - `TasksDbContext` added
 - Initial SQL schema defined in `Data/TasksTable.sql`
