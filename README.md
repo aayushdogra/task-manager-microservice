@@ -66,7 +66,7 @@ This starts a tasks_db PostgreSQL instance on port 5432 with:
 - User: postgres
 - Password: postgres
 - Database: tasks_db
-```**
+```
 
 ---
 
