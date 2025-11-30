@@ -33,7 +33,7 @@ Used for rapid local development.
 - EF Core packages installed
 - `TasksDbContext` added
 - Initial SQL schema defined in `Data/TasksTable.sql`
-- PostgreSQL integration planned (via Docker)
+- PostgreSQL integration prepared (via Docker)
 
 ### ✔ Health check endpoint
 
@@ -47,9 +47,19 @@ Used for rapid local development.
 - `PUT /tasks/{id}`
 - `DELETE /tasks/{id}`
 
-### ✔ Docker-ready project (planned)
+### ✔ Docker-ready project (in progress)
 
-Will include a `Dockerfile` + `docker-compose.yml`.
+- `docker-compose.yml` (PostgreSQL service)  
+- Application Dockerfile (planned)
+
+---
+
+## 🐳 Docker (PostgreSQL)
+
+To start the PostgreSQL database locally:
+
+```bash
+docker compose up -d
 
 ---
 
@@ -58,7 +68,8 @@ Will include a `Dockerfile` + `docker-compose.yml`.
 - Connect PostgreSQL using EF Core
 - Implement DbTaskService with real persistence
 - Add CreatedAt / UpdatedAt timestamps
-- Add Docker support
+- Add Application Dockerfile
+- Add environment-based configuration
 
 ---
 
@@ -76,7 +87,9 @@ TaskManager/
 │   ├── ITaskService.cs
 │   └── InMemoryTaskService.cs
 ├── Data/
-│   └── (data files later)
+│   ├── TasksDbContext.cs
+│   └── TasksTable.sql
+├── docker-compose.yml
 ├── README.md
 └── TaskManager.csproj
 ```
