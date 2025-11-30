@@ -60,13 +60,12 @@ To start the PostgreSQL database locally:
 
 ```bash
 docker compose up -d 
-
+```
 This starts a tasks_db PostgreSQL instance on port 5432 with:
 
 - User: postgres
 - Password: postgres
 - Database: tasks_db
-```
 
 ---
 
