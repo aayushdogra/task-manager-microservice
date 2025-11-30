@@ -59,15 +59,22 @@ Used for rapid local development.
 To start the PostgreSQL database locally:
 
 ```bash
-docker compose up -d
+docker compose up -d 
+
+This starts a tasks_db PostgreSQL instance on port 5432 with:
+
+- User: postgres
+- Password: postgres
+- Database: tasks_db
+```**
 
 ---
 
 ## 📅 Next Milestone (WIP)
 
 - Connect PostgreSQL using EF Core
-- Implement DbTaskService with real persistence
-- Add CreatedAt / UpdatedAt timestamps
+- Implement `DbTaskService` with real persistence
+- Add `CreatedAt` and `UpdatedAt` timestamps
 - Add Application Dockerfile
 - Add environment-based configuration
 
@@ -93,3 +100,4 @@ TaskManager/
 ├── README.md
 └── TaskManager.csproj
 ```
+---
