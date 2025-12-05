@@ -1,6 +1,3 @@
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using TaskManager.Data;
 
@@ -30,7 +27,14 @@ public static class HealthEndpoints
                 return Results.Problem($"Database error: {ex.Message}");
             }
         })
-            .WithName("DatabaseHealthCheck");
+        .WithName("DatabaseHealthCheck");
+
+        app.MapGet("/db-tasks-count", async (TasksDbContext db) =>
+        {
+            var count = await db.Tasks.CountAsync();
+            return Results.Ok(new { tasksInDb = count });
+        })
+        .WithName("DatabaseTasksCount");
 
         return app;
     }
