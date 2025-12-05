@@ -13,10 +13,13 @@ public class DbTaskService : ITaskService
     public IEnumerable<TaskItem> GetAll()
     {
         // TODO: implement DB-backed retrieval of all tasks
-        return Enumerable.Empty<TaskItem>();
+        return _db.Tasks.AsNoTracking().ToList();
     }
 
-    public TaskItem? GetById(int id) => null;
+    public TaskItem? GetById(int id)
+    {
+        return _db.Tasks.AsNoTracking().FirstOrDefault(t => t.Id == id);
+    }
 
     public TaskItem Create(string title, string? description)
     {
