@@ -16,6 +16,9 @@ builder.Services.AddDbContext<TasksDbContext>(options => options.UseNpgsql(conne
 // register our task service as singleton for now
 builder.Services.AddSingleton<ITaskService, InMemoryTaskService>(); // dependency injection
 
+// Register DbTaskService as a service so [FromServices] can resolve it
+builder.Services.AddScoped<DbTaskService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

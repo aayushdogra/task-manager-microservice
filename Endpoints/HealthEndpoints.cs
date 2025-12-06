@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Mvc;
 using TaskManager.Data;
+using TaskManager.Services;
 
 namespace TaskManager.Endpoints;
 
@@ -35,6 +37,14 @@ public static class HealthEndpoints
             return Results.Ok(new { tasksInDb = count });
         })
         .WithName("DatabaseTasksCount");
+
+        // Debug endpoint to test create tasks in the database
+        app.MapPost("/db-test-task", ([FromQuery] string title, [FromQuery] string? description, [FromServices] DbTaskService dbTasks) =>
+        {
+            var created = dbTasks.Create(title, description);
+            return Results.Ok(created);
+        })
+        .WithName("DbTestCreateTask");
 
         return app;
     }

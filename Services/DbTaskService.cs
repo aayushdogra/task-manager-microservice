@@ -23,7 +23,21 @@ public class DbTaskService : ITaskService
 
     public TaskItem Create(string title, string? description)
     {
-        throw new NotImplementedException("DbTaskService.Create is not implemented yet.");
+        var now = DateTime.UtcNow;
+
+        var entity = new TaskItem(
+            Id: 0,
+            Title: title,
+            Description: description,
+            IsCompleted: false,
+            CreatedAt: now,
+            UpdatedAt: now
+        );
+
+        _db.Tasks.Add(entity);
+        _db.SaveChanges();
+
+        return entity;
     }
 
     public TaskItem? Update(int id, string title, string? description, bool isCompleted)
