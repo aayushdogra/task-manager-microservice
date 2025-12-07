@@ -12,8 +12,7 @@ public class DbTaskService : ITaskService
 
     public IEnumerable<TaskItem> GetAll()
     {
-        // TODO: implement DB-backed retrieval of all tasks
-        return _db.Tasks.AsNoTracking().ToList();
+        return [.. _db.Tasks.AsNoTracking()];
     }
 
     public TaskItem? GetById(int id)
