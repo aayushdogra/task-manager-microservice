@@ -13,11 +13,8 @@ var connectionString = builder.Configuration.GetConnectionString("TasksDb")
 
 builder.Services.AddDbContext<TasksDbContext>(options => options.UseNpgsql(connectionString));
 
-// register our task service as singleton for now
-builder.Services.AddSingleton<ITaskService, InMemoryTaskService>(); // dependency injection
-
 // Register DbTaskService as a service so [FromServices] can resolve it
-builder.Services.AddScoped<DbTaskService>();
+builder.Services.AddScoped<ITaskService, DbTaskService>();
 
 var app = builder.Build();
 

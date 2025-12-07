@@ -42,11 +42,30 @@ public class DbTaskService : ITaskService
 
     public TaskItem? Update(int id, string title, string? description, bool isCompleted)
     {
-        throw new NotImplementedException("DbTaskService.Update is not implemented yet.");
+        var task = _db.Tasks.FirstOrDefault(task => task.Id == id);
+        if (task == null) return null;
+
+        var updatedTask = task with
+        {
+            Title = title,
+            Description = description,
+            IsCompleted = isCompleted,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _db.Entry(task).CurrentValues.SetValues(updatedTask);
+        _db.SaveChanges();
+
+        return updatedTask;
     }
 
     public bool Delete(int id)
     {
-        throw new NotImplementedException("DbTaskService.Delete is not implemented yet.");
+        var task = _db.Tasks.FirstOrDefault(task => task.Id == id);
+        if (task == null) return false;
+
+        _db.Tasks.Remove(task);
+        _db.SaveChanges();
+        return true;
     }
 }
