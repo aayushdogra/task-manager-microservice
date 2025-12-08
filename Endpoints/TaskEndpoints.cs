@@ -19,7 +19,16 @@ public static class TaskEndpoints
             if (isCompleted.HasValue)
                 all = all.Where(t => t.IsCompleted == isCompleted.Value);
 
-            return Results.Ok(all);
+            var response = all.Select(t => new TaskResponse(
+                t.Id,
+                t.Title,
+                t.Description,
+                t.IsCompleted,
+                t.CreatedAt,
+                t.UpdatedAt
+            ));
+
+            return Results.Ok(response);
         })
         .WithName("GetTasks");
 
@@ -27,7 +36,19 @@ public static class TaskEndpoints
         app.MapGet("/tasks/{id:int}", (int id, ITaskService tasks) =>
         {
             var task = tasks.GetById(id);
-            return task is not null ? Results.Ok(task) : Results.NotFound();
+
+            if (task is null) Results.NotFound();
+
+            var response = new TaskResponse(
+                task!.Id,
+                task.Title,
+                task.Description,
+                task.IsCompleted,
+                task.CreatedAt,
+                task.UpdatedAt
+            );
+
+            return Results.Ok(response); 
         })
         .WithName("GetTaskById");
 
@@ -38,18 +59,41 @@ public static class TaskEndpoints
                 return Results.BadRequest(new { error = "Title is required" });
 
             var created = tasks.Create(request.Title, request.Description);
-            return Results.Created($"/tasks/{created.Id}", created);
+
+            var response = new TaskResponse(
+                created.Id,
+                created.Title,
+                created.Description,
+                created.IsCompleted,
+                created.CreatedAt,
+                created.UpdatedAt
+            );
+
+            return Results.Created($"/tasks/{created.Id}", response);
         })
         .WithName("CreateTask");
 
         // PUT /tasks/{id} - update existing task
-        app.MapPut("/tasks/{id:int}", async (int id, UpdateTaskRequest request, ITaskService tasks) =>
+        app.MapPut("/tasks/{id:int}", (int id, UpdateTaskRequest request, ITaskService tasks) =>
         {
             if (string.IsNullOrWhiteSpace(request.Title))
                 return Results.BadRequest(new { error = "Title is required" });
 
             var updated = tasks.Update(id, request.Title, request.Description, request.IsCompleted);
-            return updated is not null ? Results.Ok(updated) : Results.NotFound();
+            
+            if(updated is null)
+                return Results.NotFound();
+
+            var response = new TaskResponse(
+                updated!.Id,
+                updated.Title,
+                updated.Description,
+                updated.IsCompleted,
+                updated.CreatedAt,
+                updated.UpdatedAt
+            );
+
+            return Results.Ok(response);
         })
         .WithName("UpdateTask");
 
@@ -63,8 +107,4 @@ public static class TaskEndpoints
 
         return app;
     }
-
-    // DTO for creating a tasks
-    public record CreateTaskRequest(string Title, string? Description);
-    public record UpdateTaskRequest(string Title, string? Description, bool IsCompleted);
 }
