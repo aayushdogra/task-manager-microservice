@@ -108,7 +108,6 @@ API connects to the DB via EF Core using the connection string in appsettings.js
 - Add Redis caching layer
 - Add pagination & filtering for `/tasks`
 - Add FluentValidation for DTOs
-- Add Serilog logging
 - Add JWT authentication
 - Add async processing via Kafka/RabbitMQ
 - Add metrics + observability tooling
