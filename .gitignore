@@ -2,6 +2,9 @@
 bin/
 obj/
 
+# Ignore logs
+logs/
+
 # Ignore Visual Studio files
 .vs/
 .vscode/

@@ -1,7 +1,7 @@
 # Task Manager Microservice (Minimal API — .NET 10)
 
-A lightweight, production-style **Task Manager microservice** built using **.NET 10 Minimal APIs**.  
-This project demonstrates clean architecture, endpoint grouping, service-layer separation, and container-ready deployment.
+A production-style **Task Manager microservice** built using **.NET 10 Minimal APIs**, PostgreSQL, and EF Core.  
+The project demonstrates clean architecture, endpoint grouping, DTO-based API contracts, service-layer abstraction, and container-ready development workflows.
 
 This service exposes REST APIs for:
 
@@ -9,35 +9,40 @@ This service exposes REST APIs for:
 - Fetching tasks
 - Updating tasks
 - Deleting tasks
-- Health monitoring (`/health`)
+- Health monitoring (`/health`, `/db-health`)
 
 ---
 
 ## 🚀 Features
 
-### ✔ Minimal API (no controllers, clean & fast)
+### ✔ Minimal API (no controllers)
+
+Lightweight, fast, and clean endpoint definitions using .NET 10 Minimal API style.
 
 ### ✔ Organized folder structure
 
-- `/Models`
-- `/Services`
-- `/Endpoints`
-- `/Data`
+- `/Models` — database entities  
+- `/Dto` — request/response objects used by API  
+- `/Services` — business logic + abstractions  
+- `/Endpoints` — endpoint mappings grouped by domain  
+- `/Data` — EF Core DbContext + SQL schema  
 
-### ✔ In-memory repository (no DB required initially)
+### ✔ DTO-based API contracts
 
-Used for rapid local development.
+All endpoints use **CreateTaskRequest**, **UpdateTaskRequest**, and **TaskResponse**  
+for clean separation between database models and public API responses.
 
-### ✔ Ready for real database (SQL) integration
+### ✔ PostgreSQL-backed persistence (EF Core)
 
-- EF Core packages installed
-- `TasksDbContext` added
-- Initial SQL schema defined in `Data/TasksTable.sql`
-- PostgreSQL integration prepared (via Docker)
+- Real database CRUD implemented in `DbTaskService`  
+- Fully persistent task creation, updates, and deletions  
+- InMemoryTaskService removed from DI (can be used for tests only)
 
-### ✔ Health check endpoint
+### ✔ Health monitoring
 
-`/health` → returns status for uptime monitoring.
+- `/health` — service health  
+- `/db-health` — PostgreSQL connectivity  
+- `/db-tasks-count` — useful for debugging DB reads/writes 
 
 ### ✔ Full Task CRUD (Completed)
 
@@ -47,10 +52,22 @@ Used for rapid local development.
 - `PUT /tasks/{id}`
 - `DELETE /tasks/{id}`
 
-### ✔ Docker-ready project (in progress)
+### ✔ Docker-ready project (database)
 
-- `docker-compose.yml` (PostgreSQL service)  
-- Application Dockerfile (planned)
+- Includes `docker-compose.yml` for running PostgreSQL locally  
+- API Dockerfile planned next
+
+### ✔ Structured Logging (Serilog)
+
+- Centralized logging using Serilog  
+- Console + rolling file logs (`logs/log-*.txt`)  
+- Supports production overrides and environment-based logging levels  
+
+### ✔ Global Exception Handling
+
+- Automatic 500 error handling  
+- Logs all unhandled exceptions with stack traces  
+- Returns clean JSON error responses
 
 ---
 
@@ -61,42 +78,111 @@ To start the PostgreSQL database locally:
 ```bash
 docker compose up -d 
 ```
-This starts a tasks_db PostgreSQL instance on port 5432 with:
+This launches a `tasks_db` PostgreSQL instance with:
 
-- User: postgres
-- Password: postgres
-- Database: tasks_db
+- Host: `localhost`
+- Port: `5432`
+- User: `postgres`
+- Password: `postgres`
+- Database: `tasks_db`
+
+API connects to the DB via EF Core using the connection string in appsettings.json or environment variables.
+
+---
+
+## 📅 Recent Milestones (Completed)
+- Switched DI from `InMemoryTaskService` → `DbTaskService`
+- Implemented full CRUD in DbTaskService (Create / GetAll / GetById / Update / Delete)
+- Added timestamps (CreatedAt, UpdatedAt)
+- Rewrote `/tasks` endpoints to use DTOs
+- Added proper TaskResponse mapping for all GET/POST/PUT routes
+- Added Serilog structured logging (console + rolling file logs)
+- Implemented global exception handling middleware
+- Added configuration support via appsettings.json + appsettings.Development.json
 
 ---
 
 ## 📅 Next Milestone (WIP)
 
-- Connect PostgreSQL using EF Core
-- Implement `DbTaskService` with real persistence
-- Add `CreatedAt` and `UpdatedAt` timestamps
 - Add Application Dockerfile
-- Add environment-based configuration
+- Add Redis caching layer
+- Add pagination & filtering for `/tasks`
+- Add FluentValidation for DTOs
+- Add Serilog logging
+- Add JWT authentication
+- Add async processing via Kafka/RabbitMQ
+- Add metrics + observability tooling
 
 ---
 
 ## 📁 Project Structure
 
 ```txt
+
 TaskManager/
 ├── Program.cs
+├── appsettings.json
+├── appsettings.Development.json
 ├── Models/
 │   └── TaskItem.cs
+│
+├── Dto/
+│   ├── CreateTaskRequest.cs
+│   ├── UpdateTaskRequest.cs
+│   └── TaskResponse.cs
+│
 ├── Endpoints/
+│   ├── TaskEndpoints.cs
 │   ├── HealthEndpoints.cs
-│   └── TaskEndpoints.cs
+│   └── DebugEndpoints.cs
+│
 ├── Services/
 │   ├── ITaskService.cs
-│   └── InMemoryTaskService.cs
+│   ├── DbTaskService.cs
+│   └── InMemoryTaskService.cs   (optional/test only)
+│
 ├── Data/
 │   ├── TasksDbContext.cs
 │   └── TasksTable.sql
-├── docker-compose.yml
-├── README.md
-└── TaskManager.csproj
+│
+├── logs/                       (auto-generated by Serilog)
+│   └── log-20231208.txt        (rolling log files, one per day)
+│
+├── docker-compose.yml          (PostgreSQL container)
+├── TaskManager.csproj
+└── README.md
+
 ```
 ---
+
+## ⚙️ Configuration (appsettings.json)
+
+The microservice uses **appsettings.json** for environment-based configuration.
+
+### Example:
+
+```json
+{
+  "ConnectionStrings": {
+    "TasksDb": "Host=localhost;Port=5432;Database=tasks_db;Username=postgres;Password=postgres"
+  },
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft": "Warning",
+        "System": "Warning"
+      }
+    },
+    "WriteTo": [
+      { "Name": "Console" },
+      {
+        "Name": "File",
+        "Args": {
+          "path": "logs/log-.txt",
+          "rollingInterval": "Day"
+        }
+      }
+    ]
+  }
+}

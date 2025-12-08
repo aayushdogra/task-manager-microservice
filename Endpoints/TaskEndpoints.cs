@@ -1,7 +1,4 @@
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
-using TaskManager.Models;
+using TaskManager.Dto;
 using TaskManager.Services;
 
 namespace TaskManager.Endpoints;

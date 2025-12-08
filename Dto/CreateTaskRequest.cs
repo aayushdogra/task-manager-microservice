@@ -1,1 +1,4 @@
-public record CreateTaskRequest(string Title, string? Description);
+namespace TaskManager.Dto
+{
+    public record CreateTaskRequest(string Title, string? Description);
+}
