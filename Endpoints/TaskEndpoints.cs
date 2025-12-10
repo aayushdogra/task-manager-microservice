@@ -21,19 +21,34 @@ public static class TaskEndpoints
             if(currentPageSize <= 0) currentPageSize = defaultPageSize;
             if(currentPageSize > maxPageSize) currentPageSize = maxPageSize;
 
-            var all = tasks.GetAll();
+            var query = tasks.GetAll();
 
             if (isCompleted.HasValue)
-                all = all.Where(t => t.IsCompleted == isCompleted.Value);
+                query = query.Where(t => t.IsCompleted == isCompleted.Value);
 
-            var sorted = all.OrderByDescending(t => t.CreatedAt);
+            // Sort by CreatedAt descending
+            var sorted = query.OrderByDescending(t => t.CreatedAt);
 
+            // Get total count before pagination and after filtering
             var totalCount = sorted.Count();
 
+            // Calculate total pages
+            var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)currentPageSize);
+
+            // Clamping logic
+            int pageToUse = currentPageNumber;
+
+            if (totalPages == 0) pageToUse = 1;
+            else
+            {
+                if (pageToUse < 1) pageToUse = 1;
+                if (pageToUse > totalPages) pageToUse = totalPages;
+            }
+
             var pageItems = sorted
-                .Skip((currentPageNumber - 1) * currentPageSize)
-                .Take(currentPageSize)
-                .ToList();
+                    .Skip((pageToUse - 1) * currentPageSize)
+                    .Take(currentPageSize)
+                    .ToList();
 
             var items = pageItems.Select(t => new TaskResponse(
                 t.Id,
@@ -46,9 +61,12 @@ public static class TaskEndpoints
 
             var response = new PagedResponse<TaskResponse>(
                 items,
-                currentPageNumber,
+                pageToUse,
                 currentPageSize,
-                totalCount
+                totalCount,
+                totalPages,
+                pageToUse < totalPages,
+                totalPages > 0 && pageToUse > 1
             );
 
             return Results.Ok(response);

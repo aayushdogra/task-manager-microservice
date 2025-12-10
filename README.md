@@ -101,6 +101,8 @@ API connects to the DB via EF Core using the connection string in appsettings.js
 - Implemented global exception handling middleware for clean error responses
 - Added configuration system using appsettings.json + appsettings.Development.json
 - Added PagedResponse<T> DTO for paginated API responses
+- Implemented page clamping and max page size limits
+- Added pagination metadata to responses
 
 ---
 

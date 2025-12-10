@@ -14,6 +14,11 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog();
 
+builder.WebHost.UseUrls("http://localhost:5156", "https://localhost:7156");
+
+// Add services to the container.
+builder.Services.AddOpenApi();
+
 // Read connection string from appsettings.json
 var connectionString = builder.Configuration.GetConnectionString("TasksDb")
                        ?? throw new InvalidOperationException("Connection string 'TasksDb' not found.");
@@ -23,42 +28,62 @@ builder.Services.AddDbContext<TasksDbContext>(options => options.UseNpgsql(conne
 // Register Task Service
 builder.Services.AddScoped<ITaskService, DbTaskService>();
 
-// Add services to the container.
-builder.Services.AddOpenApi();
-
-var app = builder.Build();
-
-// Global Exception Handler Middleware
-app.UseExceptionHandler(errorApp =>
+try
 {
-    errorApp.Run(async context =>
+    var app = builder.Build();
+
+    // Global Exception Handler Middleware
+    app.UseExceptionHandler(errorApp =>
     {
-        var exception = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
-
-        Log.Error(exception, "Unhandled exception occurred");
-
-        context.Response.StatusCode = 500;
-        await context.Response.WriteAsJsonAsync(new
+        errorApp.Run(async context =>
         {
-            error = "An unexpected error occurred.",
-            details = exception?.Message // optional: remove in production
+            var exception = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
+
+            Log.Error(exception, "Unhandled exception occurred during request execution");
+
+            context.Response.StatusCode = 500;
+            await context.Response.WriteAsJsonAsync(new
+            {
+                error = "An unexpected error occurred.",
+                details = exception?.Message
+            });
         });
     });
-});
 
-// Serilog request logging
-app.UseSerilogRequestLogging();
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHttpsRedirection();
+    }
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
+    // Configure the HTTP request pipeline.
+    if (app.Environment.IsDevelopment())
+    {
+        app.MapOpenApi();
+    }
+
+    // Serilog request logging
+    app.UseSerilogRequestLogging();
+
+    // Map endpoints
+    app.MapHealthEndpoints();
+    app.MapTaskEndpoints();
+
+    app.Lifetime.ApplicationStarted.Register(() =>
+    {
+        var urls = app.Urls?.Any() == true ? string.Join(", ", app.Urls) : "(none)";
+        Log.Information("Application started. Environment: {Env}; Listening on: {Urls}",
+            app.Environment.EnvironmentName,
+            urls);
+    });
+
+    app.Run();
 }
-
-app.UseHttpsRedirection();
-
-// Map endpoints
-app.MapHealthEndpoints();
-app.MapTaskEndpoints();
-
-app.Run();
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Host terminated unexpectedly during startup");
+    throw;
+}
+finally
+{
+    Log.CloseAndFlush();
+}
