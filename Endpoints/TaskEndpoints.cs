@@ -7,16 +7,35 @@ public static class TaskEndpoints
 {
     public static IEndpointRouteBuilder MapTaskEndpoints(this IEndpointRouteBuilder app)
     {
-        // GET /tasks - list all tasks
-        // Filter by isCompleted if query parameter is provided
-        app.MapGet("/tasks", (bool? isCompleted, ITaskService tasks) =>
+        // GET /tasks - paginated, filter by isCompleted, sorted by CreatedAt desc
+        app.MapGet("/tasks", (bool? isCompleted, int?page, int?pageSize, ITaskService tasks) =>
         {
+            const int defaultPageNumber = 1;
+            const int defaultPageSize = 10;
+            const int maxPageSize = 50;
+
+            int currentPageNumber = page.GetValueOrDefault(defaultPageNumber);
+            int currentPageSize = pageSize.GetValueOrDefault(defaultPageSize);
+
+            if(currentPageNumber <= 0) currentPageNumber = defaultPageNumber;
+            if(currentPageSize <= 0) currentPageSize = defaultPageSize;
+            if(currentPageSize > maxPageSize) currentPageSize = maxPageSize;
+
             var all = tasks.GetAll();
 
             if (isCompleted.HasValue)
                 all = all.Where(t => t.IsCompleted == isCompleted.Value);
 
-            var response = all.Select(t => new TaskResponse(
+            var sorted = all.OrderByDescending(t => t.CreatedAt);
+
+            var totalCount = sorted.Count();
+
+            var pageItems = sorted
+                .Skip((currentPageNumber - 1) * currentPageSize)
+                .Take(currentPageSize)
+                .ToList();
+
+            var items = pageItems.Select(t => new TaskResponse(
                 t.Id,
                 t.Title,
                 t.Description,
@@ -24,6 +43,13 @@ public static class TaskEndpoints
                 t.CreatedAt,
                 t.UpdatedAt
             ));
+
+            var response = new PagedResponse<TaskResponse>(
+                items,
+                currentPageNumber,
+                currentPageSize,
+                totalCount
+            );
 
             return Results.Ok(response);
         })
