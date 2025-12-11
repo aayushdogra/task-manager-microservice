@@ -1,4 +1,6 @@
+using Serilog;
 using TaskManager.Dto;
+using TaskManager.Models;
 using TaskManager.Services;
 
 namespace TaskManager.Endpoints;
@@ -8,8 +10,36 @@ public static class TaskEndpoints
     public static IEndpointRouteBuilder MapTaskEndpoints(this IEndpointRouteBuilder app)
     {
         // GET /tasks - paginated, filter by isCompleted, sorted by CreatedAt desc
-        app.MapGet("/tasks", (bool? isCompleted, int?page, int?pageSize, ITaskService tasks) =>
+        app.MapGet("/tasks", (bool? isCompleted, int? page, int? pageSize, string? sortBy, string? sortDir, ITaskService tasks) =>
         {
+            const TaskSortBy defaultSortBy = TaskSortBy.CreatedAt;
+            const SortDirection defaultSortDir = SortDirection.Desc;
+
+            // Parse sortBy (case-insensitive). If parsing fails, fallback to default.
+            TaskSortBy currentSortBy = defaultSortBy;
+            if (!string.IsNullOrWhiteSpace(sortBy))
+            {
+                if (!Enum.TryParse<TaskSortBy>(sortBy.Trim(), true, out var parsedSortBy))
+                {
+                    // Friendly fallback: log and use default
+                    Log.Warning("Invalid sortBy value '{SortBy}', using default '{Default}'", sortBy, defaultSortBy);
+                    currentSortBy = defaultSortBy;
+                }
+                else currentSortBy = parsedSortBy;
+            }
+
+            // Parse sortDir
+            SortDirection currentDir = defaultSortDir;
+            if (!string.IsNullOrWhiteSpace(sortDir))
+            {
+                if (!Enum.TryParse<SortDirection>(sortDir.Trim(), true, out var parsedDir))
+                {
+                    Log.Warning("Invalid sortDir value '{SortDir}', using default '{Default}'", sortDir, defaultSortDir);
+                    currentDir = defaultSortDir;
+                }
+                else currentDir = parsedDir;
+            }
+
             const int defaultPageNumber = 1;
             const int defaultPageSize = 10;
             const int maxPageSize = 50;
@@ -26,8 +56,15 @@ public static class TaskEndpoints
             if (isCompleted.HasValue)
                 query = query.Where(t => t.IsCompleted == isCompleted.Value);
 
-            // Sort by CreatedAt descending
-            var sorted = query.OrderByDescending(t => t.CreatedAt);
+            IQueryable<TaskItem> sorted = (currentSortBy, currentDir) switch
+            {
+                (TaskSortBy.Title, SortDirection.Asc) => query.OrderBy(t => t.Title),
+                (TaskSortBy.Title, SortDirection.Desc) => query.OrderByDescending(t => t.Title),
+                (TaskSortBy.UpdatedAt, SortDirection.Asc) => query.OrderBy(t => t.UpdatedAt),
+                (TaskSortBy.UpdatedAt, SortDirection.Desc) => query.OrderByDescending(t => t.UpdatedAt),
+                (TaskSortBy.CreatedAt, SortDirection.Asc) => query.OrderBy(t => t.CreatedAt),
+                _ => query.OrderByDescending(t => t.CreatedAt)
+            };
 
             // Get total count before pagination and after filtering
             var totalCount = sorted.Count();
@@ -36,11 +73,12 @@ public static class TaskEndpoints
             var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)currentPageSize);
 
             // Clamping logic
-            int pageToUse = currentPageNumber;
+            int pageToUse;
 
             if (totalPages == 0) pageToUse = 1;
             else
             {
+                pageToUse = currentPageNumber;
                 if (pageToUse < 1) pageToUse = 1;
                 if (pageToUse > totalPages) pageToUse = totalPages;
             }

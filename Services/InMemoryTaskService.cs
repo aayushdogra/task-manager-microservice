@@ -7,7 +7,7 @@ public class InMemoryTaskService : ITaskService
     private readonly List<TaskItem> _tasks = new();
     private int _nextId = 1;
 
-    public IEnumerable<TaskItem> GetAll() => _tasks;
+    public IQueryable<TaskItem> GetAll() => _tasks.AsQueryable();
 
     public TaskItem? GetById(int id) => _tasks.FirstOrDefault(t => t.Id == id);
 

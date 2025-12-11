@@ -9,9 +9,9 @@ public class DbTaskService(TasksDbContext db, ILogger<DbTaskService> logger) : I
     private readonly ILogger<DbTaskService> _logger = logger;
     private readonly TasksDbContext _db = db;
 
-    public IEnumerable<TaskItem> GetAll()
+    public IQueryable<TaskItem> GetAll()
     {
-        return [.. _db.Tasks.AsNoTracking()];
+        return _db.Tasks.AsQueryable();
     }
 
     public TaskItem? GetById(int id)
