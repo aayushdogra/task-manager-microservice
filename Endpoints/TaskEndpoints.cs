@@ -12,34 +12,47 @@ public static class TaskEndpoints
         // GET /tasks - paginated, filter by isCompleted, sorted by CreatedAt desc
         app.MapGet("/tasks", (bool? isCompleted, int? page, int? pageSize, string? sortBy, string? sortDir, ITaskService tasks) =>
         {
+            // Allowed enum names for validation
+            var allowedSortBy = Enum.GetNames(typeof(TaskSortBy));
+            var allowedSortDir = Enum.GetNames(typeof(SortDirection));
+
+            // Default values
             const TaskSortBy defaultSortBy = TaskSortBy.CreatedAt;
             const SortDirection defaultSortDir = SortDirection.Desc;
 
-            // Parse sortBy (case-insensitive). If parsing fails, fallback to default.
+            // Strict validation for sortBy
             TaskSortBy currentSortBy = defaultSortBy;
+
             if (!string.IsNullOrWhiteSpace(sortBy))
             {
                 if (!Enum.TryParse<TaskSortBy>(sortBy.Trim(), true, out var parsedSortBy))
                 {
-                    // Friendly fallback: log and use default
-                    Log.Warning("Invalid sortBy value '{SortBy}', using default '{Default}'", sortBy, defaultSortBy);
-                    currentSortBy = defaultSortBy;
+                    return Results.BadRequest(new 
+                    { 
+                        error = "Invalid sortBy parameter.",
+                        allowedValues = allowedSortBy
+                    });
                 }
-                else currentSortBy = parsedSortBy;
+                currentSortBy = parsedSortBy;
             }
 
-            // Parse sortDir
+            // Strict validation for sortDir
             SortDirection currentDir = defaultSortDir;
+
             if (!string.IsNullOrWhiteSpace(sortDir))
             {
                 if (!Enum.TryParse<SortDirection>(sortDir.Trim(), true, out var parsedDir))
                 {
-                    Log.Warning("Invalid sortDir value '{SortDir}', using default '{Default}'", sortDir, defaultSortDir);
-                    currentDir = defaultSortDir;
+                    return Results.BadRequest(new
+                    {
+                        error = "Invalid sortDir parameter.",
+                        allowedValues = allowedSortDir
+                    });
                 }
-                else currentDir = parsedDir;
+                currentDir = parsedDir;
             }
 
+            // Pagination defaults and limits
             const int defaultPageNumber = 1;
             const int defaultPageSize = 10;
             const int maxPageSize = 50;
@@ -51,11 +64,13 @@ public static class TaskEndpoints
             if(currentPageSize <= 0) currentPageSize = defaultPageSize;
             if(currentPageSize > maxPageSize) currentPageSize = maxPageSize;
 
+            // Query source
             var query = tasks.GetAll();
 
             if (isCompleted.HasValue)
                 query = query.Where(t => t.IsCompleted == isCompleted.Value);
 
+            // Apply primary sorting
             IQueryable<TaskItem> sorted = (currentSortBy, currentDir) switch
             {
                 (TaskSortBy.Title, SortDirection.Asc) => query.OrderBy(t => t.Title),
