@@ -70,24 +70,30 @@ public static class TaskEndpoints
             if (isCompleted.HasValue)
                 query = query.Where(t => t.IsCompleted == isCompleted.Value);
 
-            // Apply primary sorting
+            // Apply primary sorting + stable secondary sorting by (Id) with direction-aware ThenBy
             IQueryable<TaskItem> sorted = (currentSortBy, currentDir) switch
             {
-                (TaskSortBy.Title, SortDirection.Asc) => query.OrderBy(t => t.Title),
-                (TaskSortBy.Title, SortDirection.Desc) => query.OrderByDescending(t => t.Title),
-                (TaskSortBy.UpdatedAt, SortDirection.Asc) => query.OrderBy(t => t.UpdatedAt),
-                (TaskSortBy.UpdatedAt, SortDirection.Desc) => query.OrderByDescending(t => t.UpdatedAt),
-                (TaskSortBy.CreatedAt, SortDirection.Asc) => query.OrderBy(t => t.CreatedAt),
-                _ => query.OrderByDescending(t => t.CreatedAt)
+                (TaskSortBy.Title, SortDirection.Asc) => 
+                    query.OrderBy(t => t.Title).ThenBy(t => t.Id),
+                (TaskSortBy.Title, SortDirection.Desc) => 
+                    query.OrderByDescending(t => t.Title).ThenByDescending(t => t.Id),
+                (TaskSortBy.UpdatedAt, SortDirection.Asc) => 
+                    query.OrderBy(t => t.UpdatedAt).ThenBy(t => t.Id),
+                (TaskSortBy.UpdatedAt, SortDirection.Desc) => 
+                    query.OrderByDescending(t => t.UpdatedAt).ThenByDescending(t => t.Id),
+                (TaskSortBy.CreatedAt, SortDirection.Asc) => 
+                    query.OrderBy(t => t.CreatedAt).ThenBy(t => t.Id),
+                _ => 
+                    query.OrderByDescending(t => t.CreatedAt).ThenByDescending(t => t.Id)
             };
 
-            // Get total count before pagination and after filtering
+            // Total count after filters, before pagination
             var totalCount = sorted.Count();
 
-            // Calculate total pages
+            // Total pages
             var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)currentPageSize);
 
-            // Clamping logic
+            // Clamping logic -> clamp page number within valid range
             int pageToUse;
 
             if (totalPages == 0) pageToUse = 1;
@@ -98,6 +104,7 @@ public static class TaskEndpoints
                 if (pageToUse > totalPages) pageToUse = totalPages;
             }
 
+            // Fetch page (use clamped pageToUse)
             var pageItems = sorted
                     .Skip((pageToUse - 1) * currentPageSize)
                     .Take(currentPageSize)

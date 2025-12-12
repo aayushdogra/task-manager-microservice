@@ -104,6 +104,8 @@ API connects to the DB via EF Core using the connection string in appsettings.js
 - Implemented page clamping and max page size limits
 - Added pagination metadata to responses
 - Added enum-based sorting to GET /tasks
+- Added Strict validation for SortBy/sortDir
+- Added stable secondary sorting (Id) to ensure consistent results
 ---
 
 ## Next Milestone (WIP)
