@@ -1,15 +1,24 @@
 # Task Manager Microservice (Minimal API — .NET 10)
 
-A production-style **Task Manager microservice** built using **.NET 10 Minimal APIs**, PostgreSQL, and EF Core.  
-The project demonstrates clean architecture, endpoint grouping, DTO-based API contracts, service-layer abstraction, and container-ready development workflows.
+A production-style **Task Manager microservice** built using **.NET 10 Minimal APIs**, PostgreSQL, EF Core, Serilog, and clean architectural practices.  
+The project demonstrates:
+
+- Clean separation of concerns  
+- DTO-based API design  
+- Service-layer abstraction  
+- Sorting + filtering + pagination  
+- Environment-based configuration  
+- Structured logging + global exception handling  
+- Debug endpoints for development & diagnostics  
 
 This service exposes REST APIs for:
 
 - Creating tasks
-- Fetching tasks
+- Fetching paginated & sorted tasks
 - Updating tasks
 - Deleting tasks
-- Health monitoring (`/health`, `/db-health`)
+- Health & DB monitoring (`GET /health`, `GET /db-health`)
+- Debugging endpoints (`GET /db-tasks-count`, `POST /db-test-task`, `GET /debug/tasks`)
 
 ---
 
@@ -22,27 +31,40 @@ Lightweight, fast, and clean endpoint definitions using .NET 10 Minimal API styl
 ### Organized folder structure
 
 - `/Models` — database entities  
-- `/Dto` — request/response objects used by API  
-- `/Services` — business logic + abstractions  
-- `/Endpoints` — endpoint mappings grouped by domain  
-- `/Data` — EF Core DbContext + SQL schema  
+- `/Dto` — API request/response contracts 
+- `/Services` — business logic (abstraction + implementations)
+- `/Endpoints` — grouped API endpoint mappings  
+- `/Data` — EF Core DbContext + SQL schema 
+- `/logs` — Serilog rolling log files
 
 ### DTO-based API contracts
 
 All endpoints use **CreateTaskRequest**, **UpdateTaskRequest**, and **TaskResponse**  
-for clean separation between database models and public API responses.
+for clean separation between database models and public API responses and to prevent leaking internal DB structures.
 
 ### PostgreSQL-backed persistence (EF Core)
 
-- Real database CRUD implemented in `DbTaskService`  
-- Fully persistent task creation, updates, and deletions  
+- Real database-backed CRUD via `DbTaskService`  
+- Fully persistent task creation, updates, and deletions
+- - Tracks `CreatedAt` and `UpdatedAt` timestamps
 - InMemoryTaskService removed from DI (can be used for tests only)
+
+### Sorting, Filtering, and Pagination
+Supported features:
+- Filter by completion status  
+- Sort by: `CreatedAt`, `UpdatedAt`, `Title`  
+- Direction: `Asc` / `Desc`  
+- Stable secondary sorting (Id)  
+- Page clamping for invalid pages  
+- Maximum page size enforcement
 
 ### Health monitoring
 
 - `/health` — service health  
 - `/db-health` — PostgreSQL connectivity  
 - `/db-tasks-count` — useful for debugging DB reads/writes 
+- `/db-test-task` - creates a test task in the DB
+- `/debug/tasks` — view top N sorted tasks (uses same sort logic as main API)
 
 ### Full Task CRUD (Completed)
 
@@ -67,7 +89,14 @@ for clean separation between database models and public API responses.
 
 - Automatic 500 error handling  
 - Logs all unhandled exceptions with stack traces  
-- Returns clean JSON error responses
+- Returns clean JSON error responses:
+
+```json
+{
+  "error": "An unexpected error occurred.",
+  "details": "Optional message (dev only)"
+}
+```
 
 ---
 
@@ -91,21 +120,25 @@ API connects to the DB via EF Core using the connection string in appsettings.js
 ---
 
 ## Recent Milestones (Completed)
+
+### Backend & API
 - Switched DI from `InMemoryTaskService` → `DbTaskService` (PostgreSQL-backed CRUD)
 - Implemented full CRUD in DbTaskService (Create / GetAll / GetById / Update / Delete)
-- Added timestamps (CreatedAt, UpdatedAt) and proper update tracking
+- Added timestamps (`CreatedAt`, `UpdatedAt`)
 - Rewrote `/tasks` endpoints to use clean DTO-based API contracts
-- Added `TaskResponse` mapping for all read/write operations
-- Implemented pagination + filtering + sorting for `/tasks`
+- Added `TaskResponse` mapping for all endpoints
+- Added **Pagination, Filtering, Sorting** with page clamping
+- Added enum-based sorting (CreatedAt, UpdatedAt, Title)
+- Added Strict validation for `sortBy` / `sortDir`
+- Added **secondary sorting (Id)** to ensure stable results
+- Implemented `PagedResponse<T>` with metadata
+
+## Infrastructure & Stability
 - Added Serilog structured logging (console + rolling file logs under `/logs`)
-- Implemented global exception handling middleware for clean error responses
-- Added configuration system using appsettings.json + appsettings.Development.json
-- Added PagedResponse<T> DTO for paginated API responses
-- Implemented page clamping and max page size limits
-- Added pagination metadata to responses
-- Added enum-based sorting to GET /tasks
-- Added Strict validation for SortBy/sortDir
-- Added stable secondary sorting (Id) to ensure consistent results
+- Added global exception handling middleware for clean error responses
+- Added configuration system using `appsettings.json` + `appsettings.Development.json`
+- Added new **Debug Endpoint:** `/debug/tasks?take=5` (uses shared sorting helper)
+
 ---
 
 ## Next Milestone (WIP)
@@ -116,15 +149,15 @@ API connects to the DB via EF Core using the connection string in appsettings.js
 - Add **Redis caching** for GET-heavy endpoints
 - Add **FluentValidation** for all input DTOs
 - Add **JWT authentication + Refresh Tokens**
-- Add **Rate limiting** (simple middleware)
+- Add **Rate limiting** middleware
 
 ---
 
 ### Intermediate / Microservice Expansion
 
 - Add async processing via **RabbitMQ/Kafka**
-- Introduce **background worker** for queue consumption
-- Implement **idempotency + retry + DLQ** patterns
+- Add a dedicated **Background Worker** service for queue consumption
+- Implement **Retry Policies, Idempotency Keys, Dead Letter Queue (DLQ)**
 
 ---
 
@@ -134,7 +167,6 @@ API connects to the DB via EF Core using the connection string in appsettings.js
 - Add **API versioning** routes (`/api/v1/...`, future `/api/v2/...`)
 - Add **Docker Compose** for API + PostgreSQL + Redis
 - Add **architecture diagrams + sequence diagrams**
-
 
 ---
 
@@ -160,26 +192,24 @@ TaskManager/
 ├── Endpoints/
 │   ├── TaskEndpoints.cs
 │   ├── HealthEndpoints.cs
-│   └── DebugEndpoints.cs
+│   └── DebugEndpoints.cs   
+│
+├── Helpers/
+│   └── TaskSortingHelper.cs
 │
 ├── Services/
 │   ├── ITaskService.cs
 │   ├── DbTaskService.cs
-│   └── InMemoryTaskService.cs    (optional / test only)
+│   └── InMemoryTaskService.cs   
 │
 ├── Data/
 │   ├── TasksDbContext.cs
 │   └── TasksTable.sql
 │
-├── SystemDesign/
-│   ├── API_Layer_Design.md
-│   ├── API_Versioning.md
-│   └── TaskService_Design_Polished.pdf
+├── logs/
+│   └── log-YYYYMMDD.txt         
 │
-├── logs/                         (auto-generated by Serilog)
-│   └── log-YYYYMMDD.txt          (rolling log files, one per day)
-│
-├── docker-compose.yml            (PostgreSQL + optional Redis)
+├── docker-compose.yml
 ├── README.md
 └── TaskManager.csproj
 

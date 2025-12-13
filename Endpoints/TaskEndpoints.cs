@@ -2,6 +2,7 @@ using Serilog;
 using TaskManager.Dto;
 using TaskManager.Models;
 using TaskManager.Services;
+using TaskManager.Helpers;
 
 namespace TaskManager.Endpoints;
 
@@ -9,12 +10,34 @@ public static class TaskEndpoints
 {
     public static IEndpointRouteBuilder MapTaskEndpoints(this IEndpointRouteBuilder app)
     {
+        /// <summary>
+        /// GET /tasks
+        /// Returns a paginated + sorted + filterable list of tasks.
+        /// Query Params:
+        /// - isCompleted (bool?) : filter by completion
+        /// - page (int?) : 1-based page number
+        /// - pageSize (int?) : size per page (max 50)
+        /// - sortBy (string?) : CreatedAt | UpdatedAt | Title
+        /// - sortDir (string?) : Asc | Desc
+        /// 
+        /// Response:
+        /// {
+        ///   items: TaskResponse[],
+        ///   page: number,
+        ///   pageSize: number,
+        ///   totalCount: number,
+        ///   totalPages: number,
+        ///   hasNextPage: bool,
+        ///   hasPreviousPage: bool
+        /// }
+        /// </summary>
+
         // GET /tasks - paginated, filter by isCompleted, sorted by CreatedAt desc
         app.MapGet("/tasks", (bool? isCompleted, int? page, int? pageSize, string? sortBy, string? sortDir, ITaskService tasks) =>
         {
             // Allowed enum names for validation
-            var allowedSortBy = Enum.GetNames(typeof(TaskSortBy));
-            var allowedSortDir = Enum.GetNames(typeof(SortDirection));
+            var allowedSortBy = Enum.GetNames<TaskSortBy>();
+            var allowedSortDir = Enum.GetNames<SortDirection>();
 
             // Default values
             const TaskSortBy defaultSortBy = TaskSortBy.CreatedAt;
@@ -70,22 +93,8 @@ public static class TaskEndpoints
             if (isCompleted.HasValue)
                 query = query.Where(t => t.IsCompleted == isCompleted.Value);
 
-            // Apply primary sorting + stable secondary sorting by (Id) with direction-aware ThenBy
-            IQueryable<TaskItem> sorted = (currentSortBy, currentDir) switch
-            {
-                (TaskSortBy.Title, SortDirection.Asc) => 
-                    query.OrderBy(t => t.Title).ThenBy(t => t.Id),
-                (TaskSortBy.Title, SortDirection.Desc) => 
-                    query.OrderByDescending(t => t.Title).ThenByDescending(t => t.Id),
-                (TaskSortBy.UpdatedAt, SortDirection.Asc) => 
-                    query.OrderBy(t => t.UpdatedAt).ThenBy(t => t.Id),
-                (TaskSortBy.UpdatedAt, SortDirection.Desc) => 
-                    query.OrderByDescending(t => t.UpdatedAt).ThenByDescending(t => t.Id),
-                (TaskSortBy.CreatedAt, SortDirection.Asc) => 
-                    query.OrderBy(t => t.CreatedAt).ThenBy(t => t.Id),
-                _ => 
-                    query.OrderByDescending(t => t.CreatedAt).ThenByDescending(t => t.Id)
-            };
+            // Apply sorting using helper
+            var sorted = TaskSortingHelper.ApplySorting(query, currentSortBy, currentDir);
 
             // Total count after filters, before pagination
             var totalCount = sorted.Count();
