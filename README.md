@@ -46,7 +46,7 @@ for clean separation between database models and public API responses and to pre
 
 - Real database-backed CRUD via `DbTaskService`  
 - Fully persistent task creation, updates, and deletions
-- - Tracks `CreatedAt` and `UpdatedAt` timestamps
+- Tracks `CreatedAt` and `UpdatedAt` timestamps
 - InMemoryTaskService removed from DI (can be used for tests only)
 
 ### Sorting, Filtering, and Pagination
