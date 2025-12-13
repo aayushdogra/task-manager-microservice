@@ -27,6 +27,7 @@ builder.Services.AddDbContext<TasksDbContext>(options => options.UseNpgsql(conne
 
 // Register Task Service
 builder.Services.AddScoped<ITaskService, DbTaskService>();
+builder.Services.AddScoped<DbTaskService>(); // Required for debug endpoint
 
 try
 {
