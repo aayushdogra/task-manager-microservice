@@ -1,8 +1,10 @@
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using TaskManager.Data;
 using TaskManager.Endpoints;
 using TaskManager.Services;
+using TaskManager.Validators;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,6 +30,9 @@ builder.Services.AddDbContext<TasksDbContext>(options => options.UseNpgsql(conne
 // Register Task Service
 builder.Services.AddScoped<ITaskService, DbTaskService>();
 builder.Services.AddScoped<DbTaskService>(); // Required for debug endpoint
+
+builder.Services.AddValidatorsFromAssemblyContaining<CreateTaskRequestValidator>();
+
 
 try
 {

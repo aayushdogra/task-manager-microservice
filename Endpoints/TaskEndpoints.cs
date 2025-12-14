@@ -1,6 +1,5 @@
-using Serilog;
+using FluentValidation;
 using TaskManager.Dto;
-using TaskManager.Models;
 using TaskManager.Services;
 using TaskManager.Helpers;
 
@@ -163,10 +162,14 @@ public static class TaskEndpoints
         .WithName("GetTaskById");
 
         // POST /tasks - create new task
-        app.MapPost("/tasks", (CreateTaskRequest request, ITaskService tasks) =>
+        app.MapPost("/tasks", async(CreateTaskRequest request, IValidator<CreateTaskRequest> validator, ITaskService tasks) =>
         {
-            if (string.IsNullOrWhiteSpace(request.Title))
-                return Results.BadRequest(new { error = "Title is required" });
+            var validationResult = await validator.ValidateAsync(request);
+
+            if (!validationResult.IsValid)
+            {
+                return Results.ValidationProblem(validationResult.ToDictionary());
+            }
 
             var created = tasks.Create(request.Title, request.Description);
 
@@ -184,10 +187,14 @@ public static class TaskEndpoints
         .WithName("CreateTask");
 
         // PUT /tasks/{id} - update existing task
-        app.MapPut("/tasks/{id:int}", (int id, UpdateTaskRequest request, ITaskService tasks) =>
+        app.MapPut("/tasks/{id:int}", async(int id, UpdateTaskRequest request, IValidator<UpdateTaskRequest> validator, ITaskService tasks) =>
         {
-            if (string.IsNullOrWhiteSpace(request.Title))
-                return Results.BadRequest(new { error = "Title is required" });
+            var validationResult = await validator.ValidateAsync(request);
+
+            if (!validationResult.IsValid)
+            {
+                return Results.ValidationProblem(validationResult.ToDictionary());
+            }
 
             var updated = tasks.Update(id, request.Title, request.Description, request.IsCompleted);
             

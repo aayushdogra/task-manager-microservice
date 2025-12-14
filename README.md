@@ -1,15 +1,18 @@
 # Task Manager Microservice (Minimal API — .NET 10)
 
-A production-style **Task Manager microservice** built using **.NET 10 Minimal APIs**, PostgreSQL, EF Core, Serilog, and clean architectural practices.  
-The project demonstrates:
+A production-style **Task Manager microservice** built using **.NET 10 Minimal APIs**, PostgreSQL, EF Core, FluentValidation, 
+Serilog, and clean architectural practices.  
+
+This project demonstrates:
 
 - Clean separation of concerns  
 - DTO-based API design  
-- Service-layer abstraction  
+- Service-layer abstraction
+- Centralized request validation (FluentValidation)
 - Sorting + filtering + pagination  
 - Environment-based configuration  
 - Structured logging + global exception handling  
-- Debug endpoints for development & diagnostics  
+- Debug & health endpoints for development & diagnostics  
 
 This service exposes REST APIs for:
 
@@ -26,39 +29,59 @@ This service exposes REST APIs for:
 
 ### Minimal API (no controllers)
 
-Lightweight, fast, and clean endpoint definitions using .NET 10 Minimal API style.
+Lightweight, fast, and clean endpoint definitions using .NET 10 Minimal API style, avoiding MVC overhead while retaining 
+structure and clarity.
 
 ### Organized folder structure
 
 - `/Models` — database entities  
-- `/Dto` — API request/response contracts 
+- `/Dto` — API request/response contracts
+- `/Validators` — FluentValidation validators
 - `/Services` — business logic (abstraction + implementations)
-- `/Endpoints` — grouped API endpoint mappings  
+- `/Endpoints` — grouped API endpoint mappings 
+- `/Helpers` - shared helper & extension logic
 - `/Data` — EF Core DbContext + SQL schema 
 - `/logs` — Serilog rolling log files
 
 ### DTO-based API contracts
 
-All endpoints use **CreateTaskRequest**, **UpdateTaskRequest**, and **TaskResponse**  
+All endpoints use **CreateTaskRequest**, **UpdateTaskRequest**, **TaskResponse** and **PagedResponse<T>** DTOs
 for clean separation between database models and public API responses and to prevent leaking internal DB structures.
+
+### Request Validation (FluentValidation)
+
+Centralized, enterprise-grade request validation using FluentValidation.
+- Separate validators for create & update requests
+- No manual validation logic in endpoints
+- Consistent `400 Bad Request` responses
+- Structured validation error format (ProblemDetails)
+
+Validation Rules
+- Title: required, 2–100 characters
+- Description: optional, max 500 characters
+
+Validation is executed explicitly in Minimal API endpoints via dependency injection.
 
 ### PostgreSQL-backed persistence (EF Core)
 
-- Real database-backed CRUD via `DbTaskService`  
+- Real database-backed CRUD via `DbTaskService` 
+- EF Core used strictly inside the service layer
+- Endpoints are DB-agnostic
 - Fully persistent task creation, updates, and deletions
 - Tracks `CreatedAt` and `UpdatedAt` timestamps
 - InMemoryTaskService removed from DI (can be used for tests only)
 
 ### Sorting, Filtering, and Pagination
 Supported features:
-- Filter by completion status  
+- Filter by completion status (`isCompleted`)
 - Sort by: `CreatedAt`, `UpdatedAt`, `Title`  
-- Direction: `Asc` / `Desc`  
-- Stable secondary sorting (Id)  
+- Direction: `Asc` / `Desc` 
+- Enum-based strict validation for sort fields
+- Stable secondary sorting (`Id`)  
 - Page clamping for invalid pages  
-- Maximum page size enforcement
+- Maximum page size enforcement (safety)
 
-### Health monitoring
+### Health monitoring & Debugging
 
 - `/health` — service health  
 - `/db-health` — PostgreSQL connectivity  
@@ -74,11 +97,6 @@ Supported features:
 - `PUT /tasks/{id}`
 - `DELETE /tasks/{id}`
 
-### Docker-ready project (database)
-
-- Includes `docker-compose.yml` for running PostgreSQL locally  
-- API Dockerfile planned next
-
 ### Structured Logging (Serilog)
 
 - Centralized logging using Serilog  
@@ -88,7 +106,8 @@ Supported features:
 ### Global Exception Handling
 
 - Automatic 500 error handling  
-- Logs all unhandled exceptions with stack traces  
+- Logs all unhandled exceptions with stack traces 
+- Prevents stack trace leakage in production
 - Returns clean JSON error responses:
 
 ```json
@@ -97,6 +116,11 @@ Supported features:
   "details": "Optional message (dev only)"
 }
 ```
+
+### Docker-ready (database)
+
+- Includes `docker-compose.yml` for running PostgreSQL locally  
+- API Dockerfile planned next
 
 ---
 
@@ -127,11 +151,14 @@ API connects to the DB via EF Core using the connection string in appsettings.js
 - Added timestamps (`CreatedAt`, `UpdatedAt`)
 - Rewrote `/tasks` endpoints to use clean DTO-based API contracts
 - Added `TaskResponse` mapping for all endpoints
-- Added **Pagination, Filtering, Sorting** with page clamping
+- Implemented **Pagination, Filtering, Sorting** with page clamping
 - Added enum-based sorting (CreatedAt, UpdatedAt, Title)
 - Added Strict validation for `sortBy` / `sortDir`
-- Added **secondary sorting (Id)** to ensure stable results
-- Implemented `PagedResponse<T>` with metadata
+- Implemented **secondary sorting (Id)** to ensure stable results
+- Added `PagedResponse<T>` with metadata
+- Added FluentValidation for create & update requests
+- Removed manual validation logic from endpoints
+- Centralized validation error handling via extensions
 
 ## Infrastructure & Stability
 - Added Serilog structured logging (console + rolling file logs under `/logs`)
@@ -147,7 +174,6 @@ API connects to the DB via EF Core using the connection string in appsettings.js
 
 - Add **Application Dockerfile** (containerize the API)
 - Add **Redis caching** for GET-heavy endpoints
-- Add **FluentValidation** for all input DTOs
 - Add **JWT authentication + Refresh Tokens**
 - Add **Rate limiting** middleware
 
@@ -189,25 +215,30 @@ TaskManager/
 │   ├── PagedResponse.cs
 │   └── SortOptions.cs
 │
+├── Validators/
+│   ├── CreateTaskRequestValidator.cs
+│   └── UpdateTaskRequestValidator.cs
+│
 ├── Endpoints/
 │   ├── TaskEndpoints.cs
 │   ├── HealthEndpoints.cs
-│   └── DebugEndpoints.cs   
+│   └── DebugEndpoints.cs
 │
 ├── Helpers/
-│   └── TaskSortingHelper.cs
+│   ├── TaskSortingHelper.cs
+│   └── ValidationExtensions.cs
 │
 ├── Services/
 │   ├── ITaskService.cs
 │   ├── DbTaskService.cs
-│   └── InMemoryTaskService.cs   
+│   └── InMemoryTaskService.cs
 │
 ├── Data/
 │   ├── TasksDbContext.cs
 │   └── TasksTable.sql
 │
 ├── logs/
-│   └── log-YYYYMMDD.txt         
+│   └── log-YYYYMMDD.txt
 │
 ├── docker-compose.yml
 ├── README.md
