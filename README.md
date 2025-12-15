@@ -5,11 +5,14 @@ Serilog, and clean architectural practices.
 
 This project demonstrates:
 
-- Clean separation of concerns  
-- DTO-based API design  
-- Service-layer abstraction
+- Minimal API–based design (no controllers)
+- Clean separation of concerns (Endpoints → Services → Data)
+- DTO-based API contracts 
 - Centralized request validation (FluentValidation)
-- Sorting + filtering + pagination  
+- Service-layer abstraction
+- Sorting + filtering + pagination
+- Stateless JWT authentication (Phase 1)
+- PostgreSQL-backed persistence (EF Core)
 - Environment-based configuration  
 - Structured logging + global exception handling  
 - Debug & health endpoints for development & diagnostics  
@@ -17,11 +20,12 @@ This project demonstrates:
 This service exposes REST APIs for:
 
 - Creating tasks
-- Fetching paginated & sorted tasks
+- Fetching paginated, filtered & sorted tasks
 - Updating tasks
 - Deleting tasks
 - Health & DB monitoring (`GET /health`, `GET /db-health`)
 - Debugging endpoints (`GET /db-tasks-count`, `POST /db-test-task`, `GET /debug/tasks`)
+- User registration, User login, JWT token issuance (Phase 1)
 
 ---
 
@@ -80,6 +84,23 @@ Supported features:
 - Stable secondary sorting (`Id`)  
 - Page clamping for invalid pages  
 - Maximum page size enforcement (safety)
+
+Pagination, sorting, and filtering logic is handled entirely in the **service layer**, 
+keeping endpoints thin and focused on HTTP concerns only.
+
+### JWT Authentication (Phase 1)
+
+Stateless JWT authentication is implemented to support user registration and login.
+
+- `POST /auth/register` — register a new user
+- `POST /auth/login` — authenticate user and issue JWT access token
+- Password hashing using `PasswordHasher<T>`
+- JWT generation using HS256
+- Token claims include `sub`, `email`, `jti`, and `expiration`
+- Authentication and authorization middleware configured in correct order
+- No refresh tokens or role-based authorization in this phase
+
+This phase focuses on establishing a clean and correct authentication foundation.
 
 ### Health monitoring & Debugging
 
@@ -160,7 +181,14 @@ API connects to the DB via EF Core using the connection string in appsettings.js
 - Removed manual validation logic from endpoints
 - Centralized validation error handling via extensions
 
-## Infrastructure & Stability
+### Authentication
+- Added user registration (`POST /auth/register`) and login (`POST /auth/login`) endpoints
+- Implemented password hashing using `PasswordHasher<T>`
+- Implemented JWT access token generation and validation
+- Configured authentication and authorization middleware
+- Verified token issuance and validation flow
+
+### Infrastructure & Stability
 - Added Serilog structured logging (console + rolling file logs under `/logs`)
 - Added global exception handling middleware for clean error responses
 - Added configuration system using `appsettings.json` + `appsettings.Development.json`
@@ -206,9 +234,14 @@ TaskManager/
 ├── appsettings.Development.json
 │
 ├── Models/
-│   └── TaskItem.cs
+│   ├── TaskItem.cs
+│   └── User.cs
 │
 ├── Dto/
+│   ├── Auth/
+│   │   ├── RegisterRequest.cs
+│   │   ├── LoginRequest.cs
+│   │   └── AuthResponse.cs
 │   ├── CreateTaskRequest.cs
 │   ├── UpdateTaskRequest.cs
 │   ├── TaskResponse.cs
@@ -221,8 +254,8 @@ TaskManager/
 │
 ├── Endpoints/
 │   ├── TaskEndpoints.cs
-│   ├── HealthEndpoints.cs
-│   └── DebugEndpoints.cs
+│   ├── AuthEndpoints.cs
+│   └── HealthEndpoints.cs
 │
 ├── Helpers/
 │   ├── TaskSortingHelper.cs
@@ -231,7 +264,10 @@ TaskManager/
 ├── Services/
 │   ├── ITaskService.cs
 │   ├── DbTaskService.cs
-│   └── InMemoryTaskService.cs
+│   ├── InMemoryTaskService.cs
+│   ├── IAuthService.cs
+│   ├── AuthService.cs
+│   └── JwtTokenGenerator.cs
 │
 ├── Data/
 │   ├── TasksDbContext.cs
@@ -258,6 +294,14 @@ The microservice uses **appsettings.json** for environment-based configuration.
   "ConnectionStrings": {
     "TasksDb": "Host=localhost;Port=5432;Database=tasks_db;Username=postgres;Password=postgres"
   },
+
+  "Jwt": {
+    "Issuer": "TaskManager",
+    "Audience": "TaskManagerUsers",
+    "Key": "DEV_ONLY_SUPER_SECRET_JWT_KEY_123456",
+    "ExpiryMinutes": 60
+  },
+
   "Serilog": {
     "MinimumLevel": {
       "Default": "Information",

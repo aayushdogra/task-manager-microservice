@@ -1,10 +1,13 @@
-using FluentValidation;
-using Microsoft.EntityFrameworkCore;
-using Serilog;
 using TaskManager.Data;
 using TaskManager.Endpoints;
 using TaskManager.Services;
 using TaskManager.Validators;
+using Serilog;
+using FluentValidation;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,7 +35,30 @@ builder.Services.AddScoped<ITaskService, DbTaskService>();
 builder.Services.AddScoped<DbTaskService>(); // Required for debug endpoint
 
 builder.Services.AddValidatorsFromAssemblyContaining<CreateTaskRequestValidator>();
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+{
+    var jwt = builder.Configuration.GetSection("Jwt");
 
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+
+        ValidIssuer = jwt["Issuer"],
+        ValidAudience = jwt["Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwt["Key"]!)
+        )
+    };
+});
+
+builder.Services.AddAuthorization();
+
+// Auth services
+builder.Services.AddSingleton<JwtTokenGenerator>();
+builder.Services.AddSingleton<IAuthService, AuthService>();
 
 try
 {
@@ -70,8 +96,13 @@ try
     // Serilog request logging
     app.UseSerilogRequestLogging();
 
+    // Authentication & Authorization
+    app.UseAuthentication();
+    app.UseAuthorization();
+
     // Map endpoints
     app.MapHealthEndpoints();
+    app.MapAuthEndpoints();
     app.MapTaskEndpoints();
 
     app.Lifetime.ApplicationStarted.Register(() =>

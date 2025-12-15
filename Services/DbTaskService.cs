@@ -1,6 +1,8 @@
-using TaskManager.Data;
-using TaskManager.Models;
 using Microsoft.EntityFrameworkCore;
+using TaskManager.Data;
+using TaskManager.Dto;
+using TaskManager.Helpers;
+using TaskManager.Models;
 
 namespace TaskManager.Services;
 
@@ -87,6 +89,55 @@ public class DbTaskService(TasksDbContext db, ILogger<DbTaskService> logger) : I
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting task {TaskId}", id);
+            throw;
+        }
+    }
+
+    public PagedResponse<TaskResponse> GetTasks(bool? isCompleted, int page, int pageSize, TaskSortBy sortBy, SortDirection sortDir)
+    {
+        try
+        {
+            IQueryable<TaskItem> query = _db.Tasks.AsNoTracking();
+
+            // Filtering
+            if (isCompleted.HasValue)
+                query = query.Where(t => t.IsCompleted == isCompleted.Value);
+            
+            // Sorting
+            query = TaskSortingHelper.ApplySorting(query, sortBy, sortDir);
+
+            // Total count before pagination
+            var totalCount = query.Count();
+
+            // Page clamping
+            var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
+
+            var pageToUse = totalPages == 0 ? 1 : Math.Clamp(page, 1, totalPages);
+
+            // Pagination
+            var items = query
+                .Skip((pageToUse - 1) * pageSize)
+                .Take(pageSize)
+                .Select(t => new TaskResponse(
+                    t.Id,
+                    t.Title,
+                    t.Description,
+                    t.IsCompleted,
+                    t.CreatedAt,
+                    t.UpdatedAt
+                ))
+                .ToList();
+
+            return new PagedResponse<TaskResponse>(
+                items,
+                pageToUse,
+                pageSize,
+                totalCount
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching paged tasks");
             throw;
         }
     }

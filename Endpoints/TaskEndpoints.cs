@@ -74,68 +74,10 @@ public static class TaskEndpoints
                 currentDir = parsedDir;
             }
 
-            // Pagination defaults and limits
-            const int defaultPageNumber = 1;
-            const int defaultPageSize = 10;
-            const int maxPageSize = 50;
+            // Normalize pagination (defaults + limits)
+            var (normalizedPage, normalizedPageSize) =PaginationHelper.Normalize(page, pageSize);
 
-            int currentPageNumber = page.GetValueOrDefault(defaultPageNumber);
-            int currentPageSize = pageSize.GetValueOrDefault(defaultPageSize);
-
-            if(currentPageNumber <= 0) currentPageNumber = defaultPageNumber;
-            if(currentPageSize <= 0) currentPageSize = defaultPageSize;
-            if(currentPageSize > maxPageSize) currentPageSize = maxPageSize;
-
-            // Query source
-            var query = tasks.GetAll();
-
-            if (isCompleted.HasValue)
-                query = query.Where(t => t.IsCompleted == isCompleted.Value);
-
-            // Apply sorting using helper
-            var sorted = TaskSortingHelper.ApplySorting(query, currentSortBy, currentDir);
-
-            // Total count after filters, before pagination
-            var totalCount = sorted.Count();
-
-            // Total pages
-            var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)currentPageSize);
-
-            // Clamping logic -> clamp page number within valid range
-            int pageToUse;
-
-            if (totalPages == 0) pageToUse = 1;
-            else
-            {
-                pageToUse = currentPageNumber;
-                if (pageToUse < 1) pageToUse = 1;
-                if (pageToUse > totalPages) pageToUse = totalPages;
-            }
-
-            // Fetch page (use clamped pageToUse)
-            var pageItems = sorted
-                    .Skip((pageToUse - 1) * currentPageSize)
-                    .Take(currentPageSize)
-                    .ToList();
-
-            var items = pageItems.Select(t => new TaskResponse(
-                t.Id,
-                t.Title,
-                t.Description,
-                t.IsCompleted,
-                t.CreatedAt,
-                t.UpdatedAt
-            ));
-
-            var response = new PagedResponse<TaskResponse>(
-                items,
-                pageToUse,
-                currentPageSize,
-                totalCount,
-                totalPages,
-                pageToUse < totalPages,
-                totalPages > 0 && pageToUse > 1
-            );
+            var response = tasks.GetTasks(isCompleted, normalizedPage, normalizedPageSize, currentSortBy, currentDir);
 
             return Results.Ok(response);
         })
@@ -146,7 +88,7 @@ public static class TaskEndpoints
         {
             var task = tasks.GetById(id);
 
-            if (task is null) Results.NotFound();
+            if (task is null) return Results.NotFound();
 
             var response = new TaskResponse(
                 task!.Id,
