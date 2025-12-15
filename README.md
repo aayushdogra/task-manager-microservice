@@ -43,7 +43,7 @@ structure and clarity.
 - `/Validators` — FluentValidation validators
 - `/Services` — business logic (abstraction + implementations)
 - `/Endpoints` — grouped API endpoint mappings 
-- `/Helpers` - shared helper & extension logic
+- `/Helpers` — shared helper & extension logic
 - `/Data` — EF Core DbContext + SQL schema 
 - `/logs` — Serilog rolling log files
 
@@ -107,7 +107,7 @@ This phase focuses on establishing a clean and correct authentication foundation
 - `/health` — service health  
 - `/db-health` — PostgreSQL connectivity  
 - `/db-tasks-count` — useful for debugging DB reads/writes 
-- `/db-test-task` - creates a test task in the DB
+- `/db-test-task` — creates a test task in the DB
 - `/debug/tasks` — view top N sorted tasks (uses same sort logic as main API)
 
 ### Full Task CRUD (Completed)
