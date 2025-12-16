@@ -62,11 +62,7 @@ public static class HealthEndpoints
             Enum.TryParse(sortBy, true, out parsedSortBy);
             Enum.TryParse(sortDir, true, out parsedSortDir);
 
-            var sorted = TaskSortingHelper.ApplySorting(
-                dbTasks.GetAll(),
-                parsedSortBy,
-                parsedSortDir
-            );
+            var sorted = TaskSortingHelper.ApplySorting(dbTasks.GetAll(), parsedSortBy, parsedSortDir);
 
             var top = sorted.Take(limit).ToList();
 

@@ -77,6 +77,7 @@ public static class TaskEndpoints
             // Normalize pagination (defaults + limits)
             var (normalizedPage, normalizedPageSize) = PaginationHelper.Normalize(page, pageSize);
 
+            // Fetch paginated, filtered, sorted tasks
             var response = tasks.GetTasks(isCompleted, normalizedPage, normalizedPageSize, currentSortBy, currentDir);
 
             return Results.Ok(response);

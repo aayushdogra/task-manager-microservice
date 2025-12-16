@@ -6,7 +6,7 @@ namespace TaskManager.Services;
 
 public class InMemoryTaskService : ITaskService
 {
-    private readonly List<TaskItem> _tasks = new();
+    private readonly List<TaskItem> _tasks = [];
     private int _nextId = 1;
 
     public IQueryable<TaskItem> GetAll() => _tasks.AsQueryable();

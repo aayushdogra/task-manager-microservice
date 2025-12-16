@@ -4,8 +4,7 @@ namespace TaskManager.Helpers;
 
 public static class ValidationExtensions
 {
-    public static Dictionary<string, string[]> ToDictionary(
-        this ValidationResult result)
+    public static Dictionary<string, string[]> ToDictionary(this ValidationResult result)
     {
         return result.Errors
             .GroupBy(e => e.PropertyName)

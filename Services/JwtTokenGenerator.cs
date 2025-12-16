@@ -7,14 +7,9 @@ using TaskManager.Models;
 
 namespace TaskManager.Services;
 
-public class JwtTokenGenerator
+public class JwtTokenGenerator(IConfiguration config)
 {
-    private readonly IConfiguration _config;
-
-    public JwtTokenGenerator(IConfiguration config)
-    {
-        _config = config;
-    }
+    private readonly IConfiguration _config = config;
 
     public string GenerateToken(User user)
     {
@@ -37,9 +32,7 @@ public class JwtTokenGenerator
             issuer: jwtConfig["Issuer"],
             audience: jwtConfig["Audience"],
             claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(
-                int.Parse(jwtConfig["ExpiryMinutes"]!)
-            ),
+            expires: DateTime.UtcNow.AddMinutes(int.Parse(jwtConfig["ExpiryMinutes"]!)),
             signingCredentials: creds
         );
 

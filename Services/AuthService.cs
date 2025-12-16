@@ -40,11 +40,7 @@ public class AuthService : IAuthService
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == request.Email) 
             ?? throw new InvalidOperationException("Invalid credentials");
 
-        var result = _hasher.VerifyHashedPassword(
-            user,
-            user.PasswordHash,
-            request.Password
-        );
+        var result = _hasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
 
         if (result == PasswordVerificationResult.Failed)
             throw new InvalidOperationException("Invalid credentials");
