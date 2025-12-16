@@ -12,6 +12,7 @@ This project demonstrates:
 - Service-layer abstraction
 - Sorting + filtering + pagination
 - Stateless JWT authentication (Phase 1)
+- Endpoint-level authorization for write APIs
 - PostgreSQL-backed persistence (EF Core)
 - Environment-based configuration  
 - Structured logging + global exception handling  
@@ -102,6 +103,33 @@ Stateless JWT authentication is implemented to support user registration and log
 
 This phase focuses on establishing a clean and correct authentication foundation.
 
+### Authorization (Write API Protection)
+
+Authorization is enforced at endpoint level using Minimal API metadata.
+- Write endpoints require authentication via `.RequireAuthorization()`
+- Read-only endpoints remian public
+- Prevents unauthorized task creation, updates, and deletions
+- Authorization is enforced via JWT middleware
+
+**Protected Endpoints:**
+- `POST /tasks`
+- `PUT /tasks/{id}`
+- `DELETE /tasks/{id}`
+- `POST /db-test-task`
+
+### Authentication Flow (Verified End-to-End)
+The authentication flow has been fully tested and verified:
+- User registers via /auth/register
+- User is persisted in PostgreSQL (users table)
+- Password is securely hashed
+- JWT access token is issued
+- Token is validated by middleware
+- Protected endpoints return: 
+    - `401 Unauthorized` without token
+    - `200 / 201` with valid token
+
+Authentication is fully stateless and does not rely on server-side sessions.
+
 ### Health monitoring & Debugging
 
 - `/health` — service health  
@@ -178,15 +206,14 @@ API connects to the DB via EF Core using the connection string in appsettings.js
 - Implemented **secondary sorting (Id)** to ensure stable results
 - Added `PagedResponse<T>` with metadata
 - Added FluentValidation for create & update requests
-- Removed manual validation logic from endpoints
 - Centralized validation error handling via extensions
 
 ### Authentication
 - Added user registration (`POST /auth/register`) and login (`POST /auth/login`) endpoints
-- Implemented password hashing using `PasswordHasher<T>`
+- Implemented password hashing
 - Implemented JWT access token generation and validation
-- Configured authentication and authorization middleware
-- Verified token issuance and validation flow
+- Secured write endpoints using `.RequireAuthorization()`
+- Verified end-to-end auth flow
 
 ### Infrastructure & Stability
 - Added Serilog structured logging (console + rolling file logs under `/logs`)

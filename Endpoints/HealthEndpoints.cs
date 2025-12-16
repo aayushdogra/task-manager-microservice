@@ -46,6 +46,7 @@ public static class HealthEndpoints
             var created = dbTasks.Create(title, description);
             return Results.Ok(created);
         })
+        .RequireAuthorization()
         .WithName("DbTestCreateTask");
 
 

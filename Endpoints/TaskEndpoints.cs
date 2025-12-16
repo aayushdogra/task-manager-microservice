@@ -49,8 +49,8 @@ public static class TaskEndpoints
             {
                 if (!Enum.TryParse<TaskSortBy>(sortBy.Trim(), true, out var parsedSortBy))
                 {
-                    return Results.BadRequest(new 
-                    { 
+                    return Results.BadRequest(new
+                    {
                         error = "Invalid sortBy parameter.",
                         allowedValues = allowedSortBy
                     });
@@ -75,7 +75,7 @@ public static class TaskEndpoints
             }
 
             // Normalize pagination (defaults + limits)
-            var (normalizedPage, normalizedPageSize) =PaginationHelper.Normalize(page, pageSize);
+            var (normalizedPage, normalizedPageSize) = PaginationHelper.Normalize(page, pageSize);
 
             var response = tasks.GetTasks(isCompleted, normalizedPage, normalizedPageSize, currentSortBy, currentDir);
 
@@ -126,6 +126,7 @@ public static class TaskEndpoints
 
             return Results.Created($"/tasks/{created.Id}", response);
         })
+        .RequireAuthorization()
         .WithName("CreateTask");
 
         // PUT /tasks/{id} - update existing task
@@ -154,6 +155,7 @@ public static class TaskEndpoints
 
             return Results.Ok(response);
         })
+        .RequireAuthorization()
         .WithName("UpdateTask");
 
         // DELETE /tasks/{id} - delete task by id
@@ -162,6 +164,7 @@ public static class TaskEndpoints
             var deleted = tasks.Delete(id);
             return deleted ? Results.NoContent() : Results.NotFound();
         })
+        .RequireAuthorization()
         .WithName("DeleteTask");
 
         return app;

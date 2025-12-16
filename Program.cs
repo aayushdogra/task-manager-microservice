@@ -58,7 +58,7 @@ builder.Services.AddAuthorization();
 
 // Auth services
 builder.Services.AddSingleton<JwtTokenGenerator>();
-builder.Services.AddSingleton<IAuthService, AuthService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 
 try
 {

@@ -4,6 +4,6 @@ namespace TaskManager.Services;
 
 public interface IAuthService
 {
-    void Register(RegisterRequest request);
-    AuthResponse Login(LoginRequest request);
+    Task<AuthResponse> RegisterAsync(RegisterRequest request);
+    Task<AuthResponse> LoginAsync(LoginRequest request);
 }
