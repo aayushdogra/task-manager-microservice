@@ -1,4 +1,5 @@
 using TaskManager.Dto.Auth;
+using TaskManager.Helpers;
 using TaskManager.Services;
 
 namespace TaskManager.Endpoints;
@@ -42,5 +43,14 @@ public static class AuthEndpoints
             var result = await auth.RefreshAsync(request.RefreshToken);
             return Results.Ok(result);
         });
+
+        app.MapGet("/me", async (HttpContext http, IAuthService auth) =>
+        {
+            var userId = http.User.GetUserId();
+            var me = await auth.GetCurrentUserAsync(userId);
+            return Results.Ok(me);
+        })
+        .RequireAuthorization()
+        .WithName("GetCurrentUser");
     }
 }

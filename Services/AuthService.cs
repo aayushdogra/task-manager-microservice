@@ -73,6 +73,13 @@ public class AuthService : IAuthService
         return new AuthResponse(newAccessToken,refreshToken); // reuse same refresh token (no rotation)
     }
 
+    public async Task<MeResponse> GetCurrentUserAsync(Guid userId)
+    {
+        var user = await _db.Users.FindAsync(userId) ?? throw new UnauthorizedAccessException();
+
+        return new MeResponse(user.Id, user.Email, user.CreatedAt);
+    }
+
     private static RefreshToken GenerateRefreshToken(Guid userId)
     {
         return new RefreshToken
