@@ -36,5 +36,11 @@ public static class AuthEndpoints
                 return Results.BadRequest(new { error = ex.Message });
             }
         });
+
+        app.MapPost("/auth/refresh", async(RefreshRequest request, IAuthService auth) =>
+        {
+            var result = await auth.RefreshAsync(request.RefreshToken);
+            return Results.Ok(result);
+        });
     }
 }

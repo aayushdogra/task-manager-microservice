@@ -3,15 +3,11 @@ using TaskManager.Models;
 
 namespace TaskManager.Data;
 
-public class  TasksDbContext : DbContext
+public class  TasksDbContext(DbContextOptions<TasksDbContext> options) : DbContext(options)
 {
-    public TasksDbContext(DbContextOptions<TasksDbContext> options) : base(options)
-    {
-
-    }
-
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -34,6 +30,16 @@ public class  TasksDbContext : DbContext
             entity.HasIndex(u => u.Email).IsUnique();
             entity.Property(u => u.PasswordHash).IsRequired();
             entity.Property(u => u.CreatedAt).HasDefaultValueSql("now()");
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.ToTable("refresh_tokens");
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.Token).IsRequired();
+            entity.Property(r => r.ExpiresAt).IsRequired();
+            entity.Property(r => r.IsRevoked).IsRequired();
+            entity.HasOne(r => r.User).WithMany().HasForeignKey(r => r.UserId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

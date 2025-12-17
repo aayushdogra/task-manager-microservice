@@ -21,7 +21,7 @@ public class DbTaskService(TasksDbContext db, ILogger<DbTaskService> logger) : I
         return _db.Tasks.AsNoTracking().FirstOrDefault(t => t.Id == id);
     }
 
-    public TaskItem Create(string title, string? description)
+    public TaskItem Create(Guid userId, string title, string? description)
     {
         try
         {
@@ -33,7 +33,8 @@ public class DbTaskService(TasksDbContext db, ILogger<DbTaskService> logger) : I
                 Description: description,
                 IsCompleted: false,
                 CreatedAt: now,
-                UpdatedAt: now
+                UpdatedAt: now,
+                UserId: userId
             );
 
             _db.Tasks.Add(entity);
@@ -48,7 +49,7 @@ public class DbTaskService(TasksDbContext db, ILogger<DbTaskService> logger) : I
         }
     }
 
-    public TaskItem? Update(int id, string title, string? description, bool isCompleted)
+    public TaskItem? Update(Guid userId, int id, string title, string? description, bool isCompleted)
     {
         try
         {

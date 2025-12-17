@@ -11,11 +11,11 @@ This project demonstrates:
 - Centralized request validation (FluentValidation)
 - Service-layer abstraction
 - Sorting + filtering + pagination
-- Stateless JWT authentication (Phase 1)
+- Stateless JWT authentication + Database-backed refresh tokens
 - Endpoint-level authorization for write APIs
 - PostgreSQL-backed persistence (EF Core)
-- Environment-based configuration  
-- Structured logging + global exception handling  
+- Environment-based configuration
+- Structured logging + global exception handling
 - Debug & health endpoints for development & diagnostics  
 
 This service exposes REST APIs for:
@@ -26,7 +26,7 @@ This service exposes REST APIs for:
 - Deleting tasks
 - Health & DB monitoring (`GET /health`, `GET /db-health`)
 - Debugging endpoints (`GET /db-tasks-count`, `POST /db-test-task`, `GET /debug/tasks`)
-- User registration, User login, JWT token issuance (Phase 1)
+- User registration, User login, JWT access and refresh token token issuance
 
 ---
 
@@ -50,12 +50,13 @@ structure and clarity.
 
 ### DTO-based API contracts
 
-All endpoints use **CreateTaskRequest**, **UpdateTaskRequest**, **TaskResponse** and **PagedResponse<T>** DTOs
-for clean separation between database models and public API responses and to prevent leaking internal DB structures.
+All endpoints use DTOs for clean separation between database models and public API responses 
+and to prevent leaking internal DB structures.
 
 ### Request Validation (FluentValidation)
 
 Centralized, enterprise-grade request validation using FluentValidation.
+
 - Separate validators for create & update requests
 - No manual validation logic in endpoints
 - Consistent `400 Bad Request` responses
@@ -84,12 +85,12 @@ Supported features:
 - Enum-based strict validation for sort fields
 - Stable secondary sorting (`Id`)  
 - Page clamping for invalid pages  
-- Maximum page size enforcement (safety)
+- Maximum page size enforcement
 
 Pagination, sorting, and filtering logic is handled entirely in the **service layer**, 
 keeping endpoints thin and focused on HTTP concerns only.
 
-### JWT Authentication (Phase 1)
+### JWT Authentication
 
 Stateless JWT authentication is implemented to support user registration and login.
 
@@ -97,15 +98,23 @@ Stateless JWT authentication is implemented to support user registration and log
 - `POST /auth/login` — authenticate user and issue JWT access token
 - Password hashing using `PasswordHasher<T>`
 - JWT generation using HS256
-- Token claims include `sub`, `email`, `jti`, and `expiration`
+- Token claims include `nameidentifier (UserId)`, `email`, `jti`, and `expiration`
 - Authentication and authorization middleware configured in correct order
-- No refresh tokens or role-based authorization in this phase
 
-This phase focuses on establishing a clean and correct authentication foundation.
+### Refresh Tokens
+
+Database-backed refresh tokens are implemented to support long-lived authentication without re-login.
+
+- `POST /auth/refresh` — issue a new access token using a valid refresh token
+- Refresh tokens are securely generated and stored in PostgreSQL
+- Tokens include expiration and revocation flags
+- Access tokens remain stateless and short-lived
+- Invalid, expired, or revoked refresh tokens return `401 Unauthorized`
 
 ### Authorization (Write API Protection)
 
 Authorization is enforced at endpoint level using Minimal API metadata.
+
 - Write endpoints require authentication via `.RequireAuthorization()`
 - Read-only endpoints remian public
 - Prevents unauthorized task creation, updates, and deletions
@@ -118,17 +127,19 @@ Authorization is enforced at endpoint level using Minimal API metadata.
 - `POST /db-test-task`
 
 ### Authentication Flow (Verified End-to-End)
+
 The authentication flow has been fully tested and verified:
-- User registers via /auth/register
-- User is persisted in PostgreSQL (users table)
+
+- User registers via `/auth/register`
+- User is persisted in PostgreSQL (`users` table)
 - Password is securely hashed
-- JWT access token is issued
+- JWT access token is issued and refresh token is generated and stored in DB
 - Token is validated by middleware
 - Protected endpoints return: 
     - `401 Unauthorized` without token
     - `200 / 201` with valid token
 
-Authentication is fully stateless and does not rely on server-side sessions.
+Authentication is fully stateless for access tokens and stateful only fir refresh tokens.
 
 ### Health monitoring & Debugging
 
@@ -154,7 +165,8 @@ Authentication is fully stateless and does not rely on server-side sessions.
 
 ### Global Exception Handling
 
-- Automatic 500 error handling  
+- Centralized exception handling via middleware
+- Maps domain exceptions to correct HTTP status codes (`400`, `401`, `500`)
 - Logs all unhandled exceptions with stack traces 
 - Prevents stack trace leakage in production
 - Returns clean JSON error responses:
@@ -168,8 +180,8 @@ Authentication is fully stateless and does not rely on server-side sessions.
 
 ### Docker-ready (database)
 
-- Includes `docker-compose.yml` for running PostgreSQL locally  
-- API Dockerfile planned next
+- Includes `docker-compose.yml` for running PostgreSQL locally
+- Database inspected and verified via Docker exec + `psql`
 
 ---
 
@@ -188,7 +200,7 @@ This launches a `tasks_db` PostgreSQL instance with:
 - Password: `postgres`
 - Database: `tasks_db`
 
-API connects to the DB via EF Core using the connection string in appsettings.json or environment variables.
+API connects to the DB via EF Core using the connection string in `appsettings.json` or environment variables.
 
 ---
 
@@ -196,14 +208,14 @@ API connects to the DB via EF Core using the connection string in appsettings.js
 
 ### Backend & API
 - Switched DI from `InMemoryTaskService` → `DbTaskService` (PostgreSQL-backed CRUD)
-- Implemented full CRUD in DbTaskService (Create / GetAll / GetById / Update / Delete)
+- Implemented full CRUD in DbTaskService
 - Added timestamps (`CreatedAt`, `UpdatedAt`)
 - Rewrote `/tasks` endpoints to use clean DTO-based API contracts
 - Added `TaskResponse` mapping for all endpoints
 - Implemented **Pagination, Filtering, Sorting** with page clamping
 - Added enum-based sorting (CreatedAt, UpdatedAt, Title)
 - Added Strict validation for `sortBy` / `sortDir`
-- Implemented **secondary sorting (Id)** to ensure stable results
+- Implemented **secondary sorting (`Id`)** to ensure stable results
 - Added `PagedResponse<T>` with metadata
 - Added FluentValidation for create & update requests
 - Centralized validation error handling via extensions
@@ -212,6 +224,8 @@ API connects to the DB via EF Core using the connection string in appsettings.js
 - Added user registration (`POST /auth/register`) and login (`POST /auth/login`) endpoints
 - Implemented password hashing
 - Implemented JWT access token generation and validation
+- Implemented DB-backed refresh tokens
+- Added `/auth/refresh` endpoint for token renewal
 - Secured write endpoints using `.RequireAuthorization()`
 - Verified end-to-end auth flow
 
@@ -220,6 +234,7 @@ API connects to the DB via EF Core using the connection string in appsettings.js
 - Added global exception handling middleware for clean error responses
 - Added configuration system using `appsettings.json` + `appsettings.Development.json`
 - Added new **Debug Endpoint:** `/debug/tasks?take=5` (uses shared sorting helper)
+- Added catch-all route handling (`MapFallBack`)
 
 ---
 
@@ -229,7 +244,6 @@ API connects to the DB via EF Core using the connection string in appsettings.js
 
 - Add **Application Dockerfile** (containerize the API)
 - Add **Redis caching** for GET-heavy endpoints
-- Add **JWT authentication + Refresh Tokens**
 - Add **Rate limiting** middleware
 
 ---
@@ -262,13 +276,15 @@ TaskManager/
 │
 ├── Models/
 │   ├── TaskItem.cs
-│   └── User.cs
+│   ├── User.cs
+│   └── RefreshToken.cs
 │
 ├── Dto/
 │   ├── Auth/
 │   │   ├── RegisterRequest.cs
 │   │   ├── LoginRequest.cs
-│   │   └── AuthResponse.cs
+│   │   ├── AuthResponse.cs
+│   │   └── RefreshRequest.cs
 │   ├── CreateTaskRequest.cs
 │   ├── UpdateTaskRequest.cs
 │   ├── TaskResponse.cs
@@ -286,7 +302,8 @@ TaskManager/
 │
 ├── Helpers/
 │   ├── TaskSortingHelper.cs
-│   └── ValidationExtensions.cs
+│   ├── ValidationExtensions.cs
+│   └── UserClaimsExtensions.cs
 │
 ├── Services/
 │   ├── ITaskService.cs

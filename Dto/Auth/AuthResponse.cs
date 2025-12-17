@@ -1,3 +1,3 @@
 namespace TaskManager.Dto.Auth;
 
-public record AuthResponse(string AccessToken);
+public record AuthResponse(string AccessToken, string RefreshToken);

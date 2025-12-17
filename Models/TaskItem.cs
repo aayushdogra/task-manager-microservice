@@ -6,5 +6,6 @@ public record TaskItem(
     string? Description,
     bool IsCompleted,
     DateTime CreatedAt,
-    DateTime UpdatedAt
+    DateTime UpdatedAt,
+    Guid UserId
 );

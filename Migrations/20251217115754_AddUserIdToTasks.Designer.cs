@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TaskManager.Data;
@@ -11,9 +12,11 @@ using TaskManager.Data;
 namespace TaskManager.Migrations
 {
     [DbContext(typeof(TasksDbContext))]
-    partial class TasksDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251217115754_AddUserIdToTasks")]
+    partial class AddUserIdToTasks
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,34 +24,6 @@ namespace TaskManager.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("TaskManager.Models.RefreshToken", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsRevoked")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Token")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("refresh_tokens", (string)null);
-                });
 
             modelBuilder.Entity("TaskManager.Models.TaskItem", b =>
                 {
@@ -109,17 +84,6 @@ namespace TaskManager.Migrations
                         .IsUnique();
 
                     b.ToTable("users", (string)null);
-                });
-
-            modelBuilder.Entity("TaskManager.Models.RefreshToken", b =>
-                {
-                    b.HasOne("TaskManager.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
                 });
 #pragma warning restore 612, 618
         }

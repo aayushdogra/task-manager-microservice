@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using TaskManager.Dto.Auth;
 using TaskManager.Models;
 using TaskManager.Data;
-using System.Threading.Tasks;
+using System.Security.Cryptography;
 
 namespace TaskManager.Services;
 
@@ -31,8 +31,13 @@ public class AuthService : IAuthService
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
 
-        var token = _jwt.GenerateToken(user);
-        return new AuthResponse(token);
+        var accessToken = _jwt.GenerateToken(user);
+        var refreshToken = GenerateRefreshToken(user.Id);
+
+        _db.RefreshTokens.Add(refreshToken);
+        await _db.SaveChangesAsync();
+
+        return new AuthResponse(accessToken, refreshToken.Token);
     }
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request)
@@ -45,7 +50,37 @@ public class AuthService : IAuthService
         if (result == PasswordVerificationResult.Failed)
             throw new InvalidOperationException("Invalid credentials");
 
-        var token = _jwt.GenerateToken(user);
-        return new AuthResponse(token);
+        var accessToken = _jwt.GenerateToken(user);
+        var refreshToken = GenerateRefreshToken(user.Id);
+
+        _db.RefreshTokens.Add(refreshToken);
+        await _db.SaveChangesAsync();
+
+        return new AuthResponse(accessToken, refreshToken.Token);
+    }
+
+    public async Task<AuthResponse> RefreshAsync(string refreshToken)
+    {
+        var token = await _db.RefreshTokens
+            .Include(r => r.User)
+            .FirstOrDefaultAsync(r => r.Token == refreshToken);
+
+        if (token is null || token.IsRevoked || token.ExpiresAt < DateTime.UtcNow)
+            throw new UnauthorizedAccessException("Invalid refresh token");
+
+        var newAccessToken = _jwt.GenerateToken(token.User);
+
+        return new AuthResponse(newAccessToken,refreshToken); // reuse same refresh token (no rotation)
+    }
+
+    private static RefreshToken GenerateRefreshToken(Guid userId)
+    {
+        return new RefreshToken
+        {
+            Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
+            UserId = userId,
+            ExpiresAt = DateTime.UtcNow.AddDays(7),
+            IsRevoked = false
+        };
     }
 }

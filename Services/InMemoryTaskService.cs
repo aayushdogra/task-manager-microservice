@@ -13,16 +13,16 @@ public class InMemoryTaskService : ITaskService
 
     public TaskItem? GetById(int id) => _tasks.FirstOrDefault(t => t.Id == id);
 
-    public TaskItem Create(string title, string? description)
+    public TaskItem Create(Guid userId, string title, string? description)
     {
         var now = DateTime.UtcNow;
 
-        var task = new TaskItem(_nextId++, title, description, false, now, now);
+        var task = new TaskItem(_nextId++, title, description, false, now, now, userId);
         _tasks.Add(task);
         return task;
     }
 
-    public TaskItem? Update(int id, string title, string? description, bool isCompleted)
+    public TaskItem? Update(Guid userId, int id, string title, string? description, bool isCompleted)
     {
         var existing = _tasks.FirstOrDefault(t => t.Id == id);
         if (existing is null) return null;

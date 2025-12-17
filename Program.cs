@@ -35,24 +35,25 @@ builder.Services.AddScoped<ITaskService, DbTaskService>();
 builder.Services.AddScoped<DbTaskService>(); // Required for debug endpoint
 
 builder.Services.AddValidatorsFromAssemblyContaining<CreateTaskRequestValidator>();
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
-{
-    var jwt = builder.Configuration.GetSection("Jwt");
-
-    options.TokenValidationParameters = new TokenValidationParameters
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
     {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
+        var jwt = builder.Configuration.GetSection("Jwt");
 
-        ValidIssuer = jwt["Issuer"],
-        ValidAudience = jwt["Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(jwt["Key"]!)
-        )
-    };
-});
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+
+            ValidIssuer = jwt["Issuer"],
+            ValidAudience = jwt["Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(
+                    Encoding.UTF8.GetBytes(jwt["Key"]!)
+            )
+        };
+    });
 
 builder.Services.AddAuthorization();
 
@@ -71,9 +72,38 @@ try
         {
             var exception = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
 
-            Log.Error(exception, "Unhandled exception occurred during request execution");
+            if (exception is null)
+            {
+                context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                await context.Response.WriteAsJsonAsync(new { error = "Unknown error" });
+                return;
+            }
 
-            context.Response.StatusCode = 500;
+            var statusCode = StatusCodes.Status500InternalServerError;
+            var errorMessage = "An unexpected error occurred.";
+
+            switch (exception)
+            {
+                case UnauthorizedAccessException:
+                    statusCode = StatusCodes.Status401Unauthorized;
+                    errorMessage = "Unauthorized.";
+                    break;
+
+                case InvalidOperationException:
+                    statusCode = StatusCodes.Status400BadRequest;
+                    errorMessage = exception.Message;
+                    break;
+
+                case ArgumentException:
+                    statusCode = StatusCodes.Status400BadRequest;
+                    errorMessage = exception.Message;
+                    break;
+            }
+
+            Log.Error(exception, $"Unhandled exception occurred during request execution. StatusCode: {statusCode}");
+
+            context.Response.StatusCode = statusCode;
+
             await context.Response.WriteAsJsonAsync(new
             {
                 error = "An unexpected error occurred.",
@@ -104,6 +134,13 @@ try
     app.MapHealthEndpoints();
     app.MapAuthEndpoints();
     app.MapTaskEndpoints();
+
+    app.MapFallback(() =>
+        Results.NotFound(new
+        {
+            error = "Route not found"
+        })
+    );
 
     app.Lifetime.ApplicationStarted.Register(() =>
     {

@@ -105,7 +105,7 @@ public static class TaskEndpoints
         .WithName("GetTaskById");
 
         // POST /tasks - create new task
-        app.MapPost("/tasks", async(CreateTaskRequest request, IValidator<CreateTaskRequest> validator, ITaskService tasks) =>
+        app.MapPost("/tasks", async(CreateTaskRequest request, IValidator<CreateTaskRequest> validator, HttpContext http, ITaskService tasks) =>
         {
             var validationResult = await validator.ValidateAsync(request);
 
@@ -114,7 +114,8 @@ public static class TaskEndpoints
                 return Results.ValidationProblem(validationResult.ToDictionary());
             }
 
-            var created = tasks.Create(request.Title, request.Description);
+            var userId = http.User.GetUserId();
+            var created = tasks.Create(userId, request.Title, request.Description);
 
             var response = new TaskResponse(
                 created.Id,
@@ -131,7 +132,7 @@ public static class TaskEndpoints
         .WithName("CreateTask");
 
         // PUT /tasks/{id} - update existing task
-        app.MapPut("/tasks/{id:int}", async(int id, UpdateTaskRequest request, IValidator<UpdateTaskRequest> validator, ITaskService tasks) =>
+        app.MapPut("/tasks/{id:int}", async(int id, UpdateTaskRequest request, IValidator<UpdateTaskRequest> validator, HttpContext http, ITaskService tasks) =>
         {
             var validationResult = await validator.ValidateAsync(request);
 
@@ -140,7 +141,8 @@ public static class TaskEndpoints
                 return Results.ValidationProblem(validationResult.ToDictionary());
             }
 
-            var updated = tasks.Update(id, request.Title, request.Description, request.IsCompleted);
+            var userId = http.User.GetUserId();
+            var updated = tasks.Update(userId, id, request.Title, request.Description, request.IsCompleted);
             
             if(updated is null)
                 return Results.NotFound();

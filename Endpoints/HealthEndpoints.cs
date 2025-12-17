@@ -41,9 +41,10 @@ public static class HealthEndpoints
         .WithName("DatabaseTasksCount");
 
         // Debug endpoint to test create tasks in the database
-        app.MapPost("/db-test-task", ([FromQuery] string title, [FromQuery] string? description, [FromServices] DbTaskService dbTasks) =>
+        app.MapPost("/db-test-task", ([FromQuery] string title, [FromQuery] string? description, HttpContext http, [FromServices] DbTaskService dbTasks) =>
         {
-            var created = dbTasks.Create(title, description);
+            var userId = http.User.GetUserId();
+            var created = dbTasks.Create(userId, title, description);
             return Results.Ok(created);
         })
         .RequireAuthorization()
