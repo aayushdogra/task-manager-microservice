@@ -26,7 +26,8 @@ This service exposes REST APIs for:
 - Deleting tasks
 - Health & DB monitoring (`GET /health`, `GET /db-health`)
 - Debugging endpoints (`GET /db-tasks-count`, `POST /db-test-task`, `GET /debug/tasks`)
-- User registration, User login, JWT access and refresh token token issuance
+- User registration, User login, JWT access and refresh token issuance
+- Fetching current authenticated user info (`GET /me`)
 
 ---
 
@@ -111,12 +112,22 @@ Database-backed refresh tokens are implemented to support long-lived authenticat
 - Access tokens remain stateless and short-lived
 - Invalid, expired, or revoked refresh tokens return `401 Unauthorized`
 
+### Current User Endpoint (`/me`)
+
+A dedicated endpoint is provided to fetch the currently authenticated user’s profile information.
+
+- `GET /me` — returns user info based on JWT claims
+- User data is fetched from the database to ensure consistency
+- Endpoint is protected via `.RequireAuthorization()`
+
+This endpoint demonstrates clean claim extraction, authenticated context handling, and DB-backed identity resolution.
+
 ### Authorization (Write API Protection)
 
 Authorization is enforced at endpoint level using Minimal API metadata.
 
 - Write endpoints require authentication via `.RequireAuthorization()`
-- Read-only endpoints remian public
+- Read-only endpoints remain public
 - Prevents unauthorized task creation, updates, and deletions
 - Authorization is enforced via JWT middleware
 
@@ -125,6 +136,7 @@ Authorization is enforced at endpoint level using Minimal API metadata.
 - `PUT /tasks/{id}`
 - `DELETE /tasks/{id}`
 - `POST /db-test-task`
+- `GET /me`
 
 ### Authentication Flow (Verified End-to-End)
 
@@ -135,11 +147,12 @@ The authentication flow has been fully tested and verified:
 - Password is securely hashed
 - JWT access token is issued and refresh token is generated and stored in DB
 - Token is validated by middleware
+- Authenticated users can retrieve their profile via `/me`
 - Protected endpoints return: 
     - `401 Unauthorized` without token
     - `200 / 201` with valid token
 
-Authentication is fully stateless for access tokens and stateful only fir refresh tokens.
+Authentication is fully stateless for access tokens and stateful only for refresh tokens.
 
 ### Health monitoring & Debugging
 
@@ -219,6 +232,7 @@ API connects to the DB via EF Core using the connection string in `appsettings.j
 - Added `PagedResponse<T>` with metadata
 - Added FluentValidation for create & update requests
 - Centralized validation error handling via extensions
+- Added `/me` endpoint to fetch current authenticated user details
 
 ### Authentication
 - Added user registration (`POST /auth/register`) and login (`POST /auth/login`) endpoints
@@ -234,7 +248,7 @@ API connects to the DB via EF Core using the connection string in `appsettings.j
 - Added global exception handling middleware for clean error responses
 - Added configuration system using `appsettings.json` + `appsettings.Development.json`
 - Added new **Debug Endpoint:** `/debug/tasks?take=5` (uses shared sorting helper)
-- Added catch-all route handling (`MapFallBack`)
+- Added catch-all route handling (`MapFallback`)
 
 ---
 
@@ -284,7 +298,8 @@ TaskManager/
 │   │   ├── RegisterRequest.cs
 │   │   ├── LoginRequest.cs
 │   │   ├── AuthResponse.cs
-│   │   └── RefreshRequest.cs
+│   │   ├── RefreshRequest.cs
+│   │   └── MeResponse.cs
 │   ├── CreateTaskRequest.cs
 │   ├── UpdateTaskRequest.cs
 │   ├── TaskResponse.cs
