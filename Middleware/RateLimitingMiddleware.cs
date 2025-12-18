@@ -1,4 +1,5 @@
 using TaskManager.RateLimiting;
+using TaskManager.Helpers;
 
 namespace TaskManager.Middleware;
 
@@ -19,7 +20,9 @@ public class RateLimitingMiddleware(RequestDelegate next)
             return;
         }
 
-        var key = GetClientKey(httpContext);
+        var useUserKey = endpoint?.Metadata.GetMetadata<RequireUserRateLimitingAttribute>() != null;
+
+        var key = useUserKey ? GetUserKeyOrFallback(httpContext) : GetIpKey(httpContext);
 
         if(!store.TryConsume(key, options, out var remaining))
         {
@@ -40,9 +43,24 @@ public class RateLimitingMiddleware(RequestDelegate next)
         await _next(httpContext);
     }
 
-    private static string GetClientKey(HttpContext context)
+    private static string GetUserKeyOrFallback(HttpContext context)
+    {
+        // Per-user rate limiting based on authenticated user ID
+        try
+        {
+            Guid userId = context.User.GetUserId();
+            return $"user:{userId}";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Safety fallback (should not happen for protected endpoints)
+            return GetIpKey(context);
+        }
+    }
+
+    private static string GetIpKey(HttpContext context)
     {
         // Per-IP rate limiting
-        return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return $"ip:{context.Connection.RemoteIpAddress}";
     }
 }

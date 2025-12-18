@@ -131,6 +131,7 @@ public static class TaskEndpoints
         })
         .RequireAuthorization()
         .WithMetadata(new RequireRateLimitingAttribute())
+        .WithMetadata(new RequireUserRateLimitingAttribute())
         .WithName("CreateTask");
 
         // PUT /tasks/{id} - update existing task
@@ -162,6 +163,7 @@ public static class TaskEndpoints
         })
         .RequireAuthorization()
         .WithMetadata(new RequireRateLimitingAttribute())
+        .WithMetadata(new RequireUserRateLimitingAttribute())
         .WithName("UpdateTask");
 
         // DELETE /tasks/{id} - delete task by id
@@ -172,6 +174,7 @@ public static class TaskEndpoints
         })
         .RequireAuthorization()
         .WithMetadata(new RequireRateLimitingAttribute())
+        .WithMetadata(new RequireUserRateLimitingAttribute())
         .WithName("DeleteTask");
 
         return app;

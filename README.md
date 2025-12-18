@@ -148,10 +148,16 @@ A middleware-based rate limiting mechanism is implemented to protect the API fro
 - Configured as 100 requests / 10 minutes
 - Implemented as middleware
 - Applied selectively using endpoint metadata
+- Supports **IP-based and per-user rate limiting**
 - Returns `429 Too Many Requests` with a friendly JSON error
 - Adds rate limit headers:
     - `X-RateLimit-Limit`
     - `X-RateLimit-Remaining`
+
+**Rate limiting strategy:**
+- Auth endpoints are rate limited by **IP**
+- Authenticated write endpoints are rate limited **per user (with IP fallback)**
+- Read-only, health, and debug endpoints are excluded
 
 **Rate limited endpoints:**
 - `POST /auth/register`
@@ -160,10 +166,6 @@ A middleware-based rate limiting mechanism is implemented to protect the API fro
 - `POST /tasks`
 - `PUT /tasks/{id}`
 - `DELETE /tasks/{id}`
-
-**Excluded endpoints:**
-- Read-only endpoints
-- Debug and health endpoints
 
 This design keeps middleware generic while allowing endpoints to explicitly opt into rate limiting.
 
@@ -265,7 +267,8 @@ TaskManager/
 │   ├── RateLimitOptions.cs
 │   ├── RateLimitEntry.cs
 │   ├── InMemoryRateLimitStore.cs
-│   └── RequireRateLimitingAttribute.cs
+│   ├── RequireRateLimitingAttribute.cs
+│   └── RequireUserRateLimitingAttribute.cs
 │
 ├── Helpers/
 │   ├── TaskSortingHelper.cs
