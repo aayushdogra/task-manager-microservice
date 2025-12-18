@@ -2,6 +2,8 @@ using TaskManager.Data;
 using TaskManager.Endpoints;
 using TaskManager.Services;
 using TaskManager.Validators;
+using TaskManager.Middleware;
+using TaskManager.RateLimiting;
 using Serilog;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
@@ -60,6 +62,17 @@ builder.Services.AddAuthorization();
 // Auth services
 builder.Services.AddSingleton<JwtTokenGenerator>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+
+// Rate Limiting
+builder.Services.AddSingleton<InMemoryRateLimitStore>();
+
+builder.Services.Configure<RateLimitOptions>(options =>
+{
+    options.PermitLimit = 100;
+    options.Window = TimeSpan.FromMinutes(10);
+});
+
+builder.Services.AddSingleton(sp => sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<RateLimitOptions>>().Value);
 
 try
 {
@@ -125,6 +138,9 @@ try
 
     // Serilog request logging
     app.UseSerilogRequestLogging();
+
+    // Rate Limiting Middleware
+    app.UseMiddleware<RateLimitingMiddleware>();
 
     // Authentication & Authorization
     app.UseAuthentication();

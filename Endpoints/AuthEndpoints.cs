@@ -1,6 +1,7 @@
 using TaskManager.Dto.Auth;
 using TaskManager.Helpers;
 using TaskManager.Services;
+using TaskManager.RateLimiting;
 
 namespace TaskManager.Endpoints;
 
@@ -19,7 +20,7 @@ public static class AuthEndpoints
             {
                 return Results.BadRequest(new { error = ex.Message });
             }
-        });
+        }).WithMetadata(new RequireRateLimitingAttribute());
 
         app.MapPost("/auth/login", async (LoginRequest request, IAuthService auth) =>
         {
@@ -36,13 +37,13 @@ public static class AuthEndpoints
             {
                 return Results.BadRequest(new { error = ex.Message });
             }
-        });
+        }).WithMetadata(new RequireRateLimitingAttribute());
 
         app.MapPost("/auth/refresh", async(RefreshRequest request, IAuthService auth) =>
         {
             var result = await auth.RefreshAsync(request.RefreshToken);
             return Results.Ok(result);
-        });
+        }).WithMetadata(new RequireRateLimitingAttribute());
 
         app.MapGet("/me", async (HttpContext http, IAuthService auth) =>
         {

@@ -2,6 +2,7 @@ using FluentValidation;
 using TaskManager.Dto;
 using TaskManager.Services;
 using TaskManager.Helpers;
+using TaskManager.RateLimiting;
 
 namespace TaskManager.Endpoints;
 
@@ -129,6 +130,7 @@ public static class TaskEndpoints
             return Results.Created($"/tasks/{created.Id}", response);
         })
         .RequireAuthorization()
+        .WithMetadata(new RequireRateLimitingAttribute())
         .WithName("CreateTask");
 
         // PUT /tasks/{id} - update existing task
@@ -159,6 +161,7 @@ public static class TaskEndpoints
             return Results.Ok(response);
         })
         .RequireAuthorization()
+        .WithMetadata(new RequireRateLimitingAttribute())
         .WithName("UpdateTask");
 
         // DELETE /tasks/{id} - delete task by id
@@ -168,6 +171,7 @@ public static class TaskEndpoints
             return deleted ? Results.NoContent() : Results.NotFound();
         })
         .RequireAuthorization()
+        .WithMetadata(new RequireRateLimitingAttribute())
         .WithName("DeleteTask");
 
         return app;

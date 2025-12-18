@@ -7,25 +7,21 @@ using System.Security.Cryptography;
 
 namespace TaskManager.Services;
 
-public class AuthService : IAuthService
+public class AuthService(TasksDbContext db, JwtTokenGenerator jwt) : IAuthService
 {
-    private readonly TasksDbContext _db;
+    private readonly TasksDbContext _db = db;
     private readonly PasswordHasher<User> _hasher = new();
-    private readonly JwtTokenGenerator _jwt;
-
-    public AuthService(TasksDbContext db, JwtTokenGenerator jwt)
-    {
-        _db = db;
-        _jwt = jwt;
-    }
+    private readonly JwtTokenGenerator _jwt = jwt;
 
     public async Task<AuthResponse> RegisterAsync(RegisterRequest request)
     {
-        var exists = await _db.Users.AnyAsync(u => u.Email == request.Email);
-        if(exists)
+        var emailExists = await _db.Users.AsNoTracking().AnyAsync(u => u.Email == request.Email);
+        
+        if(emailExists)
             throw new InvalidOperationException("User already exists");
 
         var user = new User { Email = request.Email };
+        
         user.PasswordHash = _hasher.HashPassword(user, request.Password);
 
         _db.Users.Add(user);
@@ -43,12 +39,12 @@ public class AuthService : IAuthService
     public async Task<AuthResponse> LoginAsync(LoginRequest request)
     {
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == request.Email) 
-            ?? throw new InvalidOperationException("Invalid credentials");
+            ?? throw new UnauthorizedAccessException("Invalid credentials");
 
-        var result = _hasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
+        var verificationResult = _hasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
 
-        if (result == PasswordVerificationResult.Failed)
-            throw new InvalidOperationException("Invalid credentials");
+        if (verificationResult != PasswordVerificationResult.Success)
+            throw new UnauthorizedAccessException("Invalid credentials");
 
         var accessToken = _jwt.GenerateToken(user);
         var refreshToken = GenerateRefreshToken(user.Id);
@@ -65,17 +61,19 @@ public class AuthService : IAuthService
             .Include(r => r.User)
             .FirstOrDefaultAsync(r => r.Token == refreshToken);
 
-        if (token is null || token.IsRevoked || token.ExpiresAt < DateTime.UtcNow)
+        if (token is null || token.IsRevoked || token.ExpiresAt <= DateTime.UtcNow)
             throw new UnauthorizedAccessException("Invalid refresh token");
 
         var newAccessToken = _jwt.GenerateToken(token.User);
 
-        return new AuthResponse(newAccessToken,refreshToken); // reuse same refresh token (no rotation)
+        return new AuthResponse(newAccessToken, refreshToken); // reuse same refresh token (no rotation)
     }
 
     public async Task<MeResponse> GetCurrentUserAsync(Guid userId)
     {
-        var user = await _db.Users.FindAsync(userId) ?? throw new UnauthorizedAccessException();
+        var user = await _db.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == userId) ?? throw new UnauthorizedAccessException();
 
         return new MeResponse(user.Id, user.Email, user.CreatedAt);
     }
