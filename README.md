@@ -13,6 +13,7 @@ This project demonstrates:
 - Sorting + filtering + pagination
 - Stateless JWT authentication + Database-backed refresh tokens
 - Endpoint-level authorization for write APIs
+- Selective rate limiting and abuse protection
 - PostgreSQL-backed persistence (EF Core)
 - Environment-based configuration
 - Structured logging + global exception handling
@@ -24,10 +25,10 @@ This service exposes REST APIs for:
 - Fetching paginated, filtered & sorted tasks
 - Updating tasks
 - Deleting tasks
-- Health & DB monitoring (`GET /health`, `GET /db-health`)
-- Debugging endpoints (`GET /db-tasks-count`, `POST /db-test-task`, `GET /debug/tasks`)
 - User registration, User login, JWT access and refresh token issuance
 - Fetching current authenticated user info (`GET /me`)
+- Health & DB monitoring (`GET /health`, `GET /db-health`)
+- Debugging endpoints (`GET /db-tasks-count`, `POST /db-test-task`, `GET /debug/tasks`)
 
 ---
 
@@ -44,7 +45,9 @@ structure and clarity.
 - `/Dto` — API request/response contracts
 - `/Validators` — FluentValidation validators
 - `/Services` — business logic (abstraction + implementations)
-- `/Endpoints` — grouped API endpoint mappings 
+- `/Endpoints` — grouped API endpoint mappings
+- `/Middleware` — cross-cutting middleware (rate limiting)
+- `/RateLimiting` — rate limiting logic & configuration
 - `/Helpers` — shared helper & extension logic
 - `/Data` — EF Core DbContext + SQL schema 
 - `/logs` — Serilog rolling log files
@@ -76,10 +79,10 @@ Validation is executed explicitly in Minimal API endpoints via dependency inject
 - Endpoints are DB-agnostic
 - Fully persistent task creation, updates, and deletions
 - Tracks `CreatedAt` and `UpdatedAt` timestamps
-- InMemoryTaskService removed from DI (can be used for tests only)
 
 ### Sorting, Filtering, and Pagination
 Supported features:
+
 - Filter by completion status (`isCompleted`)
 - Sort by: `CreatedAt`, `UpdatedAt`, `Title`  
 - Direction: `Asc` / `Desc` 
@@ -88,8 +91,7 @@ Supported features:
 - Page clamping for invalid pages  
 - Maximum page size enforcement
 
-Pagination, sorting, and filtering logic is handled entirely in the **service layer**, 
-keeping endpoints thin and focused on HTTP concerns only.
+All logic is handled entirely in the **service layer**, keeping endpoints thin and focused on HTTP concerns only.
 
 ### JWT Authentication
 
@@ -100,15 +102,14 @@ Stateless JWT authentication is implemented to support user registration and log
 - Password hashing using `PasswordHasher<T>`
 - JWT generation using HS256
 - Token claims include `nameidentifier (UserId)`, `email`, `jti`, and `expiration`
-- Authentication and authorization middleware configured in correct order
 
 ### Refresh Tokens
 
-Database-backed refresh tokens are implemented to support long-lived authentication without re-login.
+Database-backed refresh tokens are implemented to support long-lived authentication.
 
 - `POST /auth/refresh` — issue a new access token using a valid refresh token
 - Refresh tokens are securely generated and stored in PostgreSQL
-- Tokens include expiration and revocation flags
+- Tokens include expiration and revocation support
 - Access tokens remain stateless and short-lived
 - Invalid, expired, or revoked refresh tokens return `401 Unauthorized`
 
@@ -120,13 +121,11 @@ A dedicated endpoint is provided to fetch the currently authenticated user’s p
 - User data is fetched from the database to ensure consistency
 - Endpoint is protected via `.RequireAuthorization()`
 
-This endpoint demonstrates clean claim extraction, authenticated context handling, and DB-backed identity resolution.
-
 ### Authorization (Write API Protection)
 
 Authorization is enforced at endpoint level using Minimal API metadata.
 
-- Write endpoints require authentication via `.RequireAuthorization()`
+- Write endpoints require authentication
 - Read-only endpoints remain public
 - Prevents unauthorized task creation, updates, and deletions
 - Authorization is enforced via JWT middleware
@@ -137,22 +136,36 @@ Authorization is enforced at endpoint level using Minimal API metadata.
 - `DELETE /tasks/{id}`
 - `POST /db-test-task`
 - `GET /me`
+- `POST /auth/register`
+- `POST /auth/login`
+- `POST /auth/refresh`
 
-### Authentication Flow (Verified End-to-End)
+### Rate Limiting & Abuse Protection
 
-The authentication flow has been fully tested and verified:
+A middleware-based rate limiting mechanism is implemented to protect the API from abuse and brute-force attacks.
 
-- User registers via `/auth/register`
-- User is persisted in PostgreSQL (`users` table)
-- Password is securely hashed
-- JWT access token is issued and refresh token is generated and stored in DB
-- Token is validated by middleware
-- Authenticated users can retrieve their profile via `/me`
-- Protected endpoints return: 
-    - `401 Unauthorized` without token
-    - `200 / 201` with valid token
+- In-memory fixed window rate limiting
+- Configured as 100 requests / 10 minutes
+- Implemented as middleware
+- Applied selectively using endpoint metadata
+- Returns `429 Too Many Requests` with a friendly JSON error
+- Adds rate limit headers:
+    - `X-RateLimit-Limit`
+    - `X-RateLimit-Remaining`
 
-Authentication is fully stateless for access tokens and stateful only for refresh tokens.
+**Rate limited endpoints:**
+- `POST /auth/register`
+- `POST /auth/login`
+- `POST /auth/refresh`
+- `POST /tasks`
+- `PUT /tasks/{id}`
+- `DELETE /tasks/{id}`
+
+**Excluded endpoints:**
+- Read-only endpoints
+- Debug and health endpoints
+
+This design keeps middleware generic while allowing endpoints to explicitly opt into rate limiting.
 
 ### Health monitoring & Debugging
 
@@ -161,14 +174,6 @@ Authentication is fully stateless for access tokens and stateful only for refres
 - `/db-tasks-count` — useful for debugging DB reads/writes 
 - `/db-test-task` — creates a test task in the DB
 - `/debug/tasks` — view top N sorted tasks (uses same sort logic as main API)
-
-### Full Task CRUD (Completed)
-
-- `GET /tasks`
-- `GET /tasks/{id}`
-- `POST /tasks`
-- `PUT /tasks/{id}`
-- `DELETE /tasks/{id}`
 
 ### Structured Logging (Serilog)
 
@@ -217,68 +222,6 @@ API connects to the DB via EF Core using the connection string in `appsettings.j
 
 ---
 
-## Recent Milestones (Completed)
-
-### Backend & API
-- Switched DI from `InMemoryTaskService` → `DbTaskService` (PostgreSQL-backed CRUD)
-- Implemented full CRUD in DbTaskService
-- Added timestamps (`CreatedAt`, `UpdatedAt`)
-- Rewrote `/tasks` endpoints to use clean DTO-based API contracts
-- Added `TaskResponse` mapping for all endpoints
-- Implemented **Pagination, Filtering, Sorting** with page clamping
-- Added enum-based sorting (CreatedAt, UpdatedAt, Title)
-- Added Strict validation for `sortBy` / `sortDir`
-- Implemented **secondary sorting (`Id`)** to ensure stable results
-- Added `PagedResponse<T>` with metadata
-- Added FluentValidation for create & update requests
-- Centralized validation error handling via extensions
-- Added `/me` endpoint to fetch current authenticated user details
-
-### Authentication
-- Added user registration (`POST /auth/register`) and login (`POST /auth/login`) endpoints
-- Implemented password hashing
-- Implemented JWT access token generation and validation
-- Implemented DB-backed refresh tokens
-- Added `/auth/refresh` endpoint for token renewal
-- Secured write endpoints using `.RequireAuthorization()`
-- Verified end-to-end auth flow
-
-### Infrastructure & Stability
-- Added Serilog structured logging (console + rolling file logs under `/logs`)
-- Added global exception handling middleware for clean error responses
-- Added configuration system using `appsettings.json` + `appsettings.Development.json`
-- Added new **Debug Endpoint:** `/debug/tasks?take=5` (uses shared sorting helper)
-- Added catch-all route handling (`MapFallback`)
-
----
-
-## Next Milestone (WIP)
-
-### High Priority (Core Backend Features)
-
-- Add **Application Dockerfile** (containerize the API)
-- Add **Redis caching** for GET-heavy endpoints
-- Add **Rate limiting** middleware
-
----
-
-### Intermediate / Microservice Expansion
-
-- Add async processing via **RabbitMQ/Kafka**
-- Add a dedicated **Background Worker** service for queue consumption
-- Implement **Retry Policies, Idempotency Keys, Dead Letter Queue (DLQ)**
-
----
-
-### Advanced / Production Quality
-
-- Add **metrics + observability** (OpenTelemetry + basic metrics endpoints)
-- Add **API versioning** routes (`/api/v1/...`, future `/api/v2/...`)
-- Add **Docker Compose** for API + PostgreSQL + Redis
-- Add **architecture diagrams + sequence diagrams**
-
----
-
 ## Project Structure
 
 ```txt
@@ -314,6 +257,15 @@ TaskManager/
 │   ├── TaskEndpoints.cs
 │   ├── AuthEndpoints.cs
 │   └── HealthEndpoints.cs
+│
+├── Middleware/
+│   └── RateLimitingMiddleware.cs
+│
+├── RateLimiting/
+│   ├── RateLimitOptions.cs
+│   ├── RateLimitEntry.cs
+│   ├── InMemoryRateLimitStore.cs
+│   └── RequireRateLimitingAttribute.cs
 │
 ├── Helpers/
 │   ├── TaskSortingHelper.cs
