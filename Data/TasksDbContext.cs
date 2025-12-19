@@ -18,8 +18,14 @@ public class  TasksDbContext(DbContextOptions<TasksDbContext> options) : DbConte
             entity.Property(t => t.Title).IsRequired().HasMaxLength(255);
             entity.Property(t => t.Description);
             entity.Property(t => t.IsCompleted).IsRequired();
-            entity.Property(t => t.CreatedAt);
-            entity.Property(t => t.UpdatedAt);
+            entity.Property(t => t.CreatedAt).HasDefaultValueSql("now()"); ;
+            entity.Property(t => t.UpdatedAt).HasDefaultValueSql("now()");
+            entity.Property(t => t.UserId).IsRequired();
+            entity.HasIndex(t => t.UserId);
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<User>(entity =>
@@ -37,9 +43,15 @@ public class  TasksDbContext(DbContextOptions<TasksDbContext> options) : DbConte
             entity.ToTable("refresh_tokens");
             entity.HasKey(r => r.Id);
             entity.Property(r => r.Token).IsRequired();
+            entity.Property(r => r.CreatedAt).HasDefaultValueSql("now()");
+            entity.Property(r => r.RevokedAt).IsRequired(false);
             entity.Property(r => r.ExpiresAt).IsRequired();
             entity.Property(r => r.IsRevoked).IsRequired();
-            entity.HasOne(r => r.User).WithMany().HasForeignKey(r => r.UserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(r => r.Token).IsUnique();
+            entity.HasOne(r => r.User)
+                .WithMany()
+                .HasForeignKey(r => r.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

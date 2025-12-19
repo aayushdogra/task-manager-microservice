@@ -33,8 +33,10 @@ public static class TaskEndpoints
         /// </summary>
 
         // GET /tasks - paginated, filter by isCompleted, sorted by CreatedAt desc
-        app.MapGet("/tasks", (bool? isCompleted, int? page, int? pageSize, string? sortBy, string? sortDir, ITaskService tasks) =>
+        app.MapGet("/tasks", (bool? isCompleted, int? page, int? pageSize, string? sortBy, string? sortDir, HttpContext http, ITaskService tasks) =>
         {
+            var userId = http.User.GetUserId();
+
             // Allowed enum names for validation
             var allowedSortBy = Enum.GetNames<TaskSortBy>();
             var allowedSortDir = Enum.GetNames<SortDirection>();
@@ -79,21 +81,23 @@ public static class TaskEndpoints
             var (normalizedPage, normalizedPageSize) = PaginationHelper.Normalize(page, pageSize);
 
             // Fetch paginated, filtered, sorted tasks
-            var response = tasks.GetTasks(isCompleted, normalizedPage, normalizedPageSize, currentSortBy, currentDir);
+            var response = tasks.GetTasks(userId, isCompleted, normalizedPage, normalizedPageSize, currentSortBy, currentDir);
 
             return Results.Ok(response);
         })
+        .RequireAuthorization()
         .WithName("GetTasks");
 
         // GET /tasks/{id} - get single task by id
-        app.MapGet("/tasks/{id:int}", (int id, ITaskService tasks) =>
+        app.MapGet("/tasks/{id:int}", (int id, HttpContext http, ITaskService tasks) =>
         {
-            var task = tasks.GetById(id);
+            var userId = http.User.GetUserId();
+            var task = tasks.GetById(userId, id);
 
             if (task is null) return Results.NotFound();
 
             var response = new TaskResponse(
-                task!.Id,
+                task.Id,
                 task.Title,
                 task.Description,
                 task.IsCompleted,
@@ -103,6 +107,7 @@ public static class TaskEndpoints
 
             return Results.Ok(response); 
         })
+        .RequireAuthorization()
         .WithName("GetTaskById");
 
         // POST /tasks - create new task
@@ -167,9 +172,11 @@ public static class TaskEndpoints
         .WithName("UpdateTask");
 
         // DELETE /tasks/{id} - delete task by id
-        app.MapDelete("/tasks/{id:int}", (int id, ITaskService tasks) =>
+        app.MapDelete("/tasks/{id:int}", (int id, HttpContext http, ITaskService tasks) =>
         {
-            var deleted = tasks.Delete(id);
+            var userId = http.User.GetUserId();
+            var deleted = tasks.Delete(userId, id);
+
             return deleted ? Results.NoContent() : Results.NotFound();
         })
         .RequireAuthorization()

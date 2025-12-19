@@ -11,45 +11,54 @@ public class InMemoryTaskService : ITaskService
 
     public IQueryable<TaskItem> GetAll() => _tasks.AsQueryable();
 
-    public TaskItem? GetById(int id) => _tasks.FirstOrDefault(t => t.Id == id);
+    public TaskItem? GetById(Guid userId, int id) => _tasks.FirstOrDefault(t => t.Id == id && t.UserId == userId);
 
     public TaskItem Create(Guid userId, string title, string? description)
     {
         var now = DateTime.UtcNow;
 
-        var task = new TaskItem(_nextId++, title, description, false, now, now, userId);
+        var task = new TaskItem 
+        { 
+            Id = _nextId++, 
+            Title = title, 
+            Description = description, 
+            IsCompleted = false, 
+            CreatedAt = now, 
+            UpdatedAt = now, 
+            UserId = userId
+        };
+
         _tasks.Add(task);
         return task;
     }
 
     public TaskItem? Update(Guid userId, int id, string title, string? description, bool isCompleted)
     {
-        var existing = _tasks.FirstOrDefault(t => t.Id == id);
-        if (existing is null) return null;
+        var existingTask = _tasks.FirstOrDefault(t => t.Id == id && t.UserId == userId);
 
-        var updated = existing with 
-        { 
-            Title = title, 
-            Description = description, 
-            IsCompleted = isCompleted,
-            UpdatedAt = DateTime.UtcNow
-        };
+        if (existingTask is null) return null;
+        
+        existingTask.Title = title;
+        existingTask.Description = description;
+        existingTask.IsCompleted = isCompleted;
+        existingTask.UpdatedAt = DateTime.UtcNow;
 
-        _tasks[_tasks.IndexOf(existing)] = updated;
-        return updated;
+        return existingTask;
     }
 
-    public bool Delete(int id)
+    public bool Delete(Guid userId, int id)
     {
-        var existing = _tasks.FirstOrDefault(t => t.Id == id);
+        var existing = _tasks.FirstOrDefault(t => t.Id == id && t.UserId == userId);
+
         if (existing is null) return false;
+
         _tasks.Remove(existing);
         return true;
     }
 
-    public PagedResponse<TaskResponse> GetTasks(bool? isCompleted, int page, int pageSize, TaskSortBy sortBy, SortDirection sortDir)
+    public PagedResponse<TaskResponse> GetTasks(Guid userId, bool? isCompleted, int page, int pageSize, TaskSortBy sortBy, SortDirection sortDir)
     {
-        IQueryable<TaskItem> query = _tasks.AsQueryable();
+        IQueryable<TaskItem> query = _tasks.Where(t => t.UserId == userId).AsQueryable();
 
         // Filtering
         if (isCompleted.HasValue)

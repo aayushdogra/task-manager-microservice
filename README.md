@@ -7,11 +7,13 @@ This project demonstrates:
 
 - Minimal API–based design (no controllers)
 - Clean separation of concerns (Endpoints → Services → Data)
-- DTO-based API contracts 
+- DTO-based API contracts
+- Explicit request validation for Minimal APIs
 - Centralized request validation (FluentValidation)
 - Service-layer abstraction
 - Sorting + filtering + pagination
 - Stateless JWT authentication + Database-backed refresh tokens
+- Secure token lifecycle (login → refresh → logout)
 - Endpoint-level authorization for write APIs
 - Selective rate limiting and abuse protection
 - PostgreSQL-backed persistence (EF Core)
@@ -66,9 +68,16 @@ Centralized, enterprise-grade request validation using FluentValidation.
 - Consistent `400 Bad Request` responses
 - Structured validation error format (ProblemDetails)
 
-Validation Rules
+Task Validation Rules
 - Title: required, 2–100 characters
 - Description: optional, max 500 characters
+
+Auth Validation Rules
+- Register/Login: 
+    - Email: required, valid email format
+    - Password: required
+- Refresh/Logout: 
+  - RefreshToken: required
 
 Validation is executed explicitly in Minimal API endpoints via dependency injection.
 
@@ -79,6 +88,7 @@ Validation is executed explicitly in Minimal API endpoints via dependency inject
 - Endpoints are DB-agnostic
 - Fully persistent task creation, updates, and deletions
 - Tracks `CreatedAt` and `UpdatedAt` timestamps
+- User-scoped task isolation enforced at query level
 
 ### Sorting, Filtering, and Pagination
 Supported features:
@@ -121,16 +131,22 @@ A dedicated endpoint is provided to fetch the currently authenticated user’s p
 - User data is fetched from the database to ensure consistency
 - Endpoint is protected via `.RequireAuthorization()`
 
-### Authorization (Write API Protection)
+### Logout Semantics (Important)
+- POST /auth/logout — logout revokes refresh tokens only
+- Access tokens remain valid until expiry (by design)
+- Logout is idempotent: Invalid or already-revoked tokens still return 204 No Content
+
+### Authorization (API Protection)
 
 Authorization is enforced at endpoint level using Minimal API metadata.
 
-- Write endpoints require authentication
-- Read-only endpoints remain public
+- Read / Write endpoints require authentication
 - Prevents unauthorized task creation, updates, and deletions
 - Authorization is enforced via JWT middleware
 
 **Protected Endpoints:**
+- `GET /tasks`
+- `GET /tasks/{id}`
 - `POST /tasks`
 - `PUT /tasks/{id}`
 - `DELETE /tasks/{id}`
@@ -253,7 +269,10 @@ TaskManager/
 │
 ├── Validators/
 │   ├── CreateTaskRequestValidator.cs
-│   └── UpdateTaskRequestValidator.cs
+│   ├── UpdateTaskRequestValidator.cs
+│   ├── RegisterRequestValidator.cs
+│   ├── LoginRequestValidator.cs
+│   └── RefreshRequestValidator.cs
 │
 ├── Endpoints/
 │   ├── TaskEndpoints.cs

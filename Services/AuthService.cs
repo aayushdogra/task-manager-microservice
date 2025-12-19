@@ -57,16 +57,42 @@ public class AuthService(TasksDbContext db, JwtTokenGenerator jwt) : IAuthServic
 
     public async Task<AuthResponse> RefreshAsync(string refreshToken)
     {
-        var token = await _db.RefreshTokens
+        var existingToken = await _db.RefreshTokens
             .Include(r => r.User)
             .FirstOrDefaultAsync(r => r.Token == refreshToken);
 
-        if (token is null || token.IsRevoked || token.ExpiresAt <= DateTime.UtcNow)
-            throw new UnauthorizedAccessException("Invalid refresh token");
+        if(existingToken is null)
+            throw new UnauthorizedAccessException("Refresh token not found");
 
-        var newAccessToken = _jwt.GenerateToken(token.User);
+        if(existingToken.IsRevoked)
+            throw new UnauthorizedAccessException("Refresh token revoked");
 
-        return new AuthResponse(newAccessToken, refreshToken); // reuse same refresh token (no rotation)
+        if (existingToken.ExpiresAt <= DateTime.UtcNow)
+            throw new UnauthorizedAccessException("Refresh token expired");
+
+        // Revoke old token (rotation)
+        RevokeRefreshToken(existingToken);
+
+        // Generate new tokens
+        var newAccessToken = _jwt.GenerateToken(existingToken.User);
+        var newRefreshToken = GenerateRefreshToken(existingToken.UserId);
+
+        _db.RefreshTokens.Add(newRefreshToken);
+        await _db.SaveChangesAsync();
+
+        return new AuthResponse(newAccessToken, newRefreshToken.Token); // reuse same refresh token (no rotation)
+    }
+
+    public async Task LogoutAsync(string refreshToken)
+    {
+        var token = await _db.RefreshTokens
+            .FirstOrDefaultAsync(r => r.Token == refreshToken);
+
+        if (token is null)
+            return; // idempotent logout
+
+        RevokeRefreshToken(token);
+        await _db.SaveChangesAsync();
     }
 
     public async Task<MeResponse> GetCurrentUserAsync(Guid userId)
@@ -87,5 +113,11 @@ public class AuthService(TasksDbContext db, JwtTokenGenerator jwt) : IAuthServic
             ExpiresAt = DateTime.UtcNow.AddDays(7),
             IsRevoked = false
         };
+    }
+
+    private void RevokeRefreshToken(RefreshToken token)
+    {
+        token.IsRevoked = true;
+        token.RevokedAt = DateTime.UtcNow;
     }
 }

@@ -16,9 +16,9 @@ public class DbTaskService(TasksDbContext db, ILogger<DbTaskService> logger) : I
         return _db.Tasks.AsQueryable();
     }
 
-    public TaskItem? GetById(int id)
+    public TaskItem? GetById(Guid userId, int id)
     {
-        return _db.Tasks.AsNoTracking().FirstOrDefault(t => t.Id == id);
+        return _db.Tasks.AsNoTracking().FirstOrDefault(t => t.Id == id && t.UserId == userId);
     }
 
     public TaskItem Create(Guid userId, string title, string? description)
@@ -27,15 +27,15 @@ public class DbTaskService(TasksDbContext db, ILogger<DbTaskService> logger) : I
         {
             var now = DateTime.UtcNow;
 
-            var entity = new TaskItem(
-                Id: 0,
-                Title: title,
-                Description: description,
-                IsCompleted: false,
-                CreatedAt: now,
-                UpdatedAt: now,
-                UserId: userId
-            );
+            var entity = new TaskItem
+            {
+                Title = title,
+                Description = description,
+                IsCompleted = false,
+                CreatedAt = now,
+                UpdatedAt = now,
+                UserId = userId
+            };
 
             _db.Tasks.Add(entity);
             _db.SaveChanges();
@@ -45,7 +45,7 @@ public class DbTaskService(TasksDbContext db, ILogger<DbTaskService> logger) : I
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating task with title {Title}", title);
-            throw; // Let global handler return 500
+            throw;
         }
     }
 
@@ -53,21 +53,17 @@ public class DbTaskService(TasksDbContext db, ILogger<DbTaskService> logger) : I
     {
         try
         {
-            var task = _db.Tasks.FirstOrDefault(task => task.Id == id);
-            if (task == null) return null;
+            var task = _db.Tasks.FirstOrDefault(task => task.Id == id && task.UserId == userId);
+            if (task is null) return null;
 
-            var updatedTask = task with
-            {
-                Title = title,
-                Description = description,
-                IsCompleted = isCompleted,
-                UpdatedAt = DateTime.UtcNow
-            };
-
-            _db.Entry(task).CurrentValues.SetValues(updatedTask);
+            task.Title = title;
+            task.Description = description;
+            task.IsCompleted = isCompleted;
+            task.UpdatedAt = DateTime.UtcNow;
+            
             _db.SaveChanges();
 
-            return updatedTask;
+            return task;
         }
         catch (Exception ex)
         {
@@ -76,12 +72,12 @@ public class DbTaskService(TasksDbContext db, ILogger<DbTaskService> logger) : I
         }
     }
 
-    public bool Delete(int id)
+    public bool Delete(Guid userId, int id)
     {
         try
         {
-            var task = _db.Tasks.FirstOrDefault(task => task.Id == id);
-            if (task == null) return false;
+            var task = _db.Tasks.FirstOrDefault(task => task.Id == id && task.UserId == userId);
+            if (task is null) return false;
 
             _db.Tasks.Remove(task);
             _db.SaveChanges();
@@ -94,11 +90,11 @@ public class DbTaskService(TasksDbContext db, ILogger<DbTaskService> logger) : I
         }
     }
 
-    public PagedResponse<TaskResponse> GetTasks(bool? isCompleted, int page, int pageSize, TaskSortBy sortBy, SortDirection sortDir)
+    public PagedResponse<TaskResponse> GetTasks(Guid userId, bool? isCompleted, int page, int pageSize, TaskSortBy sortBy, SortDirection sortDir)
     {
         try
         {
-            IQueryable<TaskItem> query = _db.Tasks.AsNoTracking();
+            IQueryable<TaskItem> query = _db.Tasks.AsNoTracking().Where(task => task.UserId == userId);
 
             // Filtering
             if (isCompleted.HasValue)
