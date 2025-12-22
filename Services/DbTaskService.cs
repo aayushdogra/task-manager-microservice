@@ -1,4 +1,7 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using StackExchange.Redis;
+using System.Text.Json;
 using TaskManager.Data;
 using TaskManager.Dto;
 using TaskManager.Helpers;
@@ -6,10 +9,12 @@ using TaskManager.Models;
 
 namespace TaskManager.Services;
 
-public class DbTaskService(TasksDbContext db, ILogger<DbTaskService> logger) : ITaskService
+public class DbTaskService(TasksDbContext db, ILogger<DbTaskService> logger, IConnectionMultiplexer redis, IHttpContextAccessor httpContextAccessor) : ITaskService
 {
     private readonly ILogger<DbTaskService> _logger = logger;
     private readonly TasksDbContext _db = db;
+    private readonly IDatabase _redis = redis.GetDatabase();
+    private readonly IHttpContextAccessor _http = httpContextAccessor;
 
     public IQueryable<TaskItem> GetAll()
     {
@@ -90,10 +95,31 @@ public class DbTaskService(TasksDbContext db, ILogger<DbTaskService> logger) : I
         }
     }
 
+    /* Cache paginated task responses per user using Redis with a cache-aside strategy and short TTL to
+    balance performance and data freshness. */
     public PagedResponse<TaskResponse> GetTasks(Guid userId, bool? isCompleted, int page, int pageSize, TaskSortBy sortBy, SortDirection sortDir)
     {
         try
         {
+            // Build cache key
+            var queryKey = $"{isCompleted}-{page}-{pageSize}-{sortBy}-{sortDir}";
+            var cacheKey = $"tasks:{userId}:{queryKey}";
+
+            // Try Cache
+            var cached = _redis.StringGet(cacheKey);
+
+            if (cached.HasValue)
+            {
+                _logger.LogInformation("Cache hit for key {CacheKey}", cacheKey);
+                var cachedResponse = JsonSerializer.Deserialize<PagedResponse<TaskResponse>>(cached!.ToString())!;
+                _http.HttpContext!.Items["CacheHit"] = true;
+                return cachedResponse;
+            }
+
+            _logger.LogInformation("Cache MISS for {CacheKey}", cacheKey);
+            _http.HttpContext!.Items["CacheHit"] = false;
+
+            // DB query
             IQueryable<TaskItem> query = _db.Tasks.AsNoTracking().Where(task => task.UserId == userId);
 
             // Filtering
@@ -125,12 +151,12 @@ public class DbTaskService(TasksDbContext db, ILogger<DbTaskService> logger) : I
                 ))
                 .ToList();
 
-            return new PagedResponse<TaskResponse>(
-                items,
-                pageToUse,
-                pageSize,
-                totalCount
-            );
+            var response =  new PagedResponse<TaskResponse>(items, pageToUse, pageSize, totalCount);
+
+            // Store in cache, short TTL for safety
+            _redis.StringSet(cacheKey, JsonSerializer.Serialize(response), TimeSpan.FromMinutes(2));
+
+            return response;
         }
         catch (Exception ex)
         {

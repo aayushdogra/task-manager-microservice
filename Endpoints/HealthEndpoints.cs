@@ -52,6 +52,7 @@ public static class HealthEndpoints
         })
         .WithName("RedisHealthCheck");
 
+        // Debug endpoint to get count of tasks in the database
         app.MapGet("/db-tasks-count", async (TasksDbContext db) =>
         {
             var count = await db.Tasks.CountAsync();
@@ -69,7 +70,7 @@ public static class HealthEndpoints
         .RequireAuthorization()
         .WithName("DbTestCreateTask");
 
-
+        // Debug endpoint to get top N tasks with sorting options
         app.MapGet("/debug/tasks", ([FromQuery] int? take, [FromQuery] string? sortBy, [FromQuery] string? sortDir, [FromServices] DbTaskService dbTasks) =>
         {
             int limit = take.GetValueOrDefault(5);

@@ -46,6 +46,8 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     return ConnectionMultiplexer.Connect(redisConnectionString);
 });
 
+builder.Services.AddHttpContextAccessor();
+
 // Register Task Service
 builder.Services.AddScoped<ITaskService, DbTaskService>();
 builder.Services.AddScoped<DbTaskService>(); // Required for debug endpoint

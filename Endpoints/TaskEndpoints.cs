@@ -83,6 +83,10 @@ public static class TaskEndpoints
             // Fetch paginated, filtered, sorted tasks
             var response = tasks.GetTasks(userId, isCompleted, normalizedPage, normalizedPageSize, currentSortBy, currentDir);
 
+            // Read cache info set by service
+            var isCacheHit = http.Items["CacheHit"] as bool? == true;
+            http.Response.Headers["X-Cache"] = isCacheHit ? "HIT" : "MISS";
+
             return Results.Ok(response);
         })
         .RequireAuthorization()
