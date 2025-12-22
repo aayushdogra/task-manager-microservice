@@ -4,6 +4,7 @@ using TaskManager.Data;
 using TaskManager.Dto;
 using TaskManager.Helpers;
 using TaskManager.Services;
+using StackExchange.Redis;
 
 namespace TaskManager.Endpoints;
 
@@ -32,6 +33,24 @@ public static class HealthEndpoints
             }
         })
         .WithName("DatabaseHealthCheck");
+
+        app.MapGet("/redis-health", (IConnectionMultiplexer redis) =>
+        {
+            try
+            {
+                var redisDB = redis.GetDatabase();
+                redisDB.StringSet("health_check", "ok");
+                var value = redisDB.StringGet("health_check");
+
+                return value == "ok" ? Results.Ok(new { status = "ok" })
+                    : Results.Problem("Redis not responding correctly");
+            }
+            catch(Exception ex)
+            {
+                return Results.Problem($"Redis error: {ex.Message}");
+            }
+        })
+        .WithName("RedisHealthCheck");
 
         app.MapGet("/db-tasks-count", async (TasksDbContext db) =>
         {

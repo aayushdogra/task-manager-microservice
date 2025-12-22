@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,6 +32,19 @@ var connectionString = builder.Configuration.GetConnectionString("TasksDb")
                        ?? throw new InvalidOperationException("Connection string 'TasksDb' not found.");
 
 builder.Services.AddDbContext<TasksDbContext>(options => options.UseNpgsql(connectionString));
+
+// Redis
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+{
+    var redisConnectionString = builder.Configuration
+        .GetSection("Redis")
+        .GetValue<string>("ConnectionString");
+
+    if (string.IsNullOrWhiteSpace(redisConnectionString))
+        throw new InvalidOperationException("Redis connection string is not configured.");
+
+    return ConnectionMultiplexer.Connect(redisConnectionString);
+});
 
 // Register Task Service
 builder.Services.AddScoped<ITaskService, DbTaskService>();
