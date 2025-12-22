@@ -1,7 +1,7 @@
 # Task Manager Microservice (Minimal API — .NET 10)
 
-A production-style **Task Manager microservice** built using **.NET 10 Minimal APIs**, PostgreSQL, EF Core, FluentValidation, 
-Serilog, and clean architectural practices.  
+A production-style **Task Manager microservice** built using **.NET 10 Minimal APIs**, PostgreSQL, EF Core, 
+FluentValidation, Serilog, and clean architectural practices.  
 
 This project demonstrates:
 
@@ -19,7 +19,9 @@ This project demonstrates:
 - PostgreSQL-backed persistence (EF Core)
 - Environment-based configuration
 - Structured logging + global exception handling
-- Debug & health endpoints for development & diagnostics  
+- Debug & health endpoints for development & diagnostics
+- Redis-based caching for read-heavy endpoints
+- Cache-aside strategy with observability via response headers
 
 This service exposes REST APIs for:
 
@@ -30,6 +32,7 @@ This service exposes REST APIs for:
 - User registration, User login, JWT access and refresh token issuance
 - Fetching current authenticated user info (`GET /me`)
 - Health & DB monitoring (`GET /health`, `GET /db-health`)
+- Redis health monitoring (`GET /redis-health`)
 - Debugging endpoints (`GET /db-tasks-count`, `POST /db-test-task`, `GET /debug/tasks`)
 
 ---
@@ -38,8 +41,8 @@ This service exposes REST APIs for:
 
 ### Minimal API (no controllers)
 
-Lightweight, fast, and clean endpoint definitions using .NET 10 Minimal API style, avoiding MVC overhead while retaining 
-structure and clarity.
+Lightweight, fast, and clean endpoint definitions using .NET 10 Minimal API style, avoiding MVC overhead while 
+retaining structure and clarity.
 
 ### Organized folder structure
 
@@ -102,6 +105,29 @@ Supported features:
 - Maximum page size enforcement
 
 All logic is handled entirely in the **service layer**, keeping endpoints thin and focused on HTTP concerns only.
+
+### Redis Caching (Read Path Optimization)
+Redis is used to optimize read-heavy task queries using a cache-aside strategy.
+
+- Implemented for GET /tasks
+- User-scoped caching to prevent data leakage
+- Cache keys include pagination, sorting, and filters
+- Cached values store **final DTO responses**, not EF entities
+- Short TTL used to balance performance and freshness
+- Redis integration is isolated to the service layer
+- Caching is treated as an **implementation detail**, not part of the service contract
+
+Cache key format: `tasks:{userId}:{queryHash}`
+
+**Cache Observability**
+
+Cache behavior is exposed via HTTP response headers:
+
+`X-Cache: HIT | MISS`
+
+- Enables easy debugging and verification
+- Keeps API response payload unchanged
+- Avoids leaking infrastructure concerns into DTOs
 
 ### JWT Authentication
 
@@ -175,23 +201,16 @@ A middleware-based rate limiting mechanism is implemented to protect the API fro
 - Authenticated write endpoints are rate limited **per user (with IP fallback)**
 - Read-only, health, and debug endpoints are excluded
 
-**Rate limited endpoints:**
-- `POST /auth/register`
-- `POST /auth/login`
-- `POST /auth/refresh`
-- `POST /tasks`
-- `PUT /tasks/{id}`
-- `DELETE /tasks/{id}`
-
 This design keeps middleware generic while allowing endpoints to explicitly opt into rate limiting.
 
 ### Health monitoring & Debugging
 
 - `/health` — service health  
-- `/db-health` — PostgreSQL connectivity  
+- `/db-health` — PostgreSQL connectivity 
+- `/redis-health` — Redis connectivity and read/write validation
 - `/db-tasks-count` — useful for debugging DB reads/writes 
 - `/db-test-task` — creates a test task in the DB
-- `/debug/tasks` — view top N sorted tasks (uses same sort logic as main API)
+- `/debug/tasks` — view top N sorted tasks
 
 ### Structured Logging (Serilog)
 
@@ -216,27 +235,34 @@ This design keeps middleware generic while allowing endpoints to explicitly opt 
 
 ### Docker-ready (database)
 
-- Includes `docker-compose.yml` for running PostgreSQL locally
+- Includes `docker-compose.yml` for running PostgreSQL and Redis locally
 - Database inspected and verified via Docker exec + `psql`
+- Includes Redis container for local caching and performance testing
 
 ---
 
-## 🐳 Docker (PostgreSQL)
+## 🐳 Docker (PostgreSQL + Redis)
 
-To start the PostgreSQL database locally:
+To start the PostgreSQL and Redis locally:
 
 ```bash
 docker compose up -d 
 ```
-This launches a `tasks_db` PostgreSQL instance with:
+This launches the following services:
 
+**PostgreSQL** (`tasks_db`)
 - Host: `localhost`
 - Port: `5432`
 - User: `postgres`
 - Password: `postgres`
 - Database: `tasks_db`
 
-API connects to the DB via EF Core using the connection string in `appsettings.json` or environment variables.
+**Redis**
+- Host: `localhost`
+- Port: `6379`
+- Used for caching read-heavy endpoints
+
+API connects to the DB via EF Core and Redis via StackExchange.Redis using configuration from `appsettings.json`.
 
 ---
 
@@ -312,49 +338,6 @@ TaskManager/
 ├── docker-compose.yml
 ├── README.md
 └── TaskManager.csproj
-
-```
----
-
-## Configuration (appsettings.json)
-
-The microservice uses **appsettings.json** for environment-based configuration.
-
-### Example:
-
-```json
-{
-  "ConnectionStrings": {
-    "TasksDb": "Host=localhost;Port=5432;Database=tasks_db;Username=postgres;Password=postgres"
-  },
-
-  "Jwt": {
-    "Issuer": "TaskManager",
-    "Audience": "TaskManagerUsers",
-    "Key": "DEV_ONLY_SUPER_SECRET_JWT_KEY_123456",
-    "ExpiryMinutes": 60
-  },
-
-  "Serilog": {
-    "MinimumLevel": {
-      "Default": "Information",
-      "Override": {
-        "Microsoft": "Warning",
-        "System": "Warning"
-      }
-    },
-    "WriteTo": [
-      { "Name": "Console" },
-      {
-        "Name": "File",
-        "Args": {
-          "path": "logs/log-.txt",
-          "rollingInterval": "Day"
-        }
-      }
-    ]
-  }
-}
 
 ```
 
