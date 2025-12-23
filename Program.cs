@@ -43,10 +43,17 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     if (string.IsNullOrWhiteSpace(redisConnectionString))
         throw new InvalidOperationException("Redis connection string is not configured.");
 
-    return ConnectionMultiplexer.Connect(redisConnectionString);
+    return ConnectionMultiplexer.Connect(new ConfigurationOptions
+    {
+        EndPoints = { redisConnectionString },
+        AbortOnConnectFail = false
+    });
 });
 
 builder.Services.AddHttpContextAccessor();
+
+// Cache abstraction (Redis behind interface)
+builder.Services.AddSingleton<ICacheService, RedisCacheService>();
 
 // Register Task Service
 builder.Services.AddScoped<ITaskService, DbTaskService>();

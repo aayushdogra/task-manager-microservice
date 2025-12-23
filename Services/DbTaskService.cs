@@ -1,7 +1,4 @@
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using StackExchange.Redis;
-using System.Text.Json;
 using TaskManager.Data;
 using TaskManager.Dto;
 using TaskManager.Helpers;
@@ -9,11 +6,15 @@ using TaskManager.Models;
 
 namespace TaskManager.Services;
 
-public class DbTaskService(TasksDbContext db, ILogger<DbTaskService> logger, IConnectionMultiplexer redis, IHttpContextAccessor httpContextAccessor) : ITaskService
+public class DbTaskService(
+    TasksDbContext db, 
+    ILogger<DbTaskService> logger,
+    ICacheService cache, 
+    IHttpContextAccessor httpContextAccessor) : ITaskService
 {
     private readonly ILogger<DbTaskService> _logger = logger;
     private readonly TasksDbContext _db = db;
-    private readonly IDatabase _redis = redis.GetDatabase();
+    private readonly ICacheService _cache = cache;
     private readonly IHttpContextAccessor _http = httpContextAccessor;
 
     public IQueryable<TaskItem> GetAll()
@@ -45,6 +46,9 @@ public class DbTaskService(TasksDbContext db, ILogger<DbTaskService> logger, ICo
             _db.Tasks.Add(entity);
             _db.SaveChanges();
 
+            // Cache Invalidation
+            _ = _cache.RemoveByPatternAsync($"tasks:{userId}:*");
+
             return entity;
         }
         catch (Exception ex)
@@ -68,6 +72,9 @@ public class DbTaskService(TasksDbContext db, ILogger<DbTaskService> logger, ICo
             
             _db.SaveChanges();
 
+            // Cache Invalidation
+            _ = _cache.RemoveByPatternAsync($"tasks:{userId}:*");
+
             return task;
         }
         catch (Exception ex)
@@ -86,6 +93,10 @@ public class DbTaskService(TasksDbContext db, ILogger<DbTaskService> logger, ICo
 
             _db.Tasks.Remove(task);
             _db.SaveChanges();
+
+            // Cache Invalidation
+            _ = _cache.RemoveByPatternAsync($"tasks:{userId}:*");
+
             return true;
         }
         catch (Exception ex)
@@ -106,12 +117,12 @@ public class DbTaskService(TasksDbContext db, ILogger<DbTaskService> logger, ICo
             var cacheKey = $"tasks:{userId}:{queryKey}";
 
             // Try Cache
-            var cached = _redis.StringGet(cacheKey);
+            var cachedResponse = _cache.GetAsync<PagedResponse<TaskResponse>>(cacheKey)
+                                       .GetAwaiter().GetResult();
 
-            if (cached.HasValue)
+            if (cachedResponse != null)
             {
-                _logger.LogInformation("Cache hit for key {CacheKey}", cacheKey);
-                var cachedResponse = JsonSerializer.Deserialize<PagedResponse<TaskResponse>>(cached!.ToString())!;
+                _logger.LogInformation("Cache HIT for key {CacheKey}", cacheKey);
                 _http.HttpContext!.Items["CacheHit"] = true;
                 return cachedResponse;
             }
@@ -154,7 +165,7 @@ public class DbTaskService(TasksDbContext db, ILogger<DbTaskService> logger, ICo
             var response =  new PagedResponse<TaskResponse>(items, pageToUse, pageSize, totalCount);
 
             // Store in cache, short TTL for safety
-            _redis.StringSet(cacheKey, JsonSerializer.Serialize(response), TimeSpan.FromMinutes(2));
+            _ = _cache.SetAsync(cacheKey, response, TimeSpan.FromMinutes(2));
 
             return response;
         }

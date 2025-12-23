@@ -22,6 +22,7 @@ This project demonstrates:
 - Debug & health endpoints for development & diagnostics
 - Redis-based caching for read-heavy endpoints
 - Cache-aside strategy with observability via response headers
+- Cache invalidation on write operations with graceful fallback
 
 This service exposes REST APIs for:
 
@@ -49,7 +50,7 @@ retaining structure and clarity.
 - `/Models` — database entities  
 - `/Dto` — API request/response contracts
 - `/Validators` — FluentValidation validators
-- `/Services` — business logic (abstraction + implementations)
+- `/Services` — business logic, caching abstraction + implementations
 - `/Endpoints` — grouped API endpoint mappings
 - `/Middleware` — cross-cutting middleware (rate limiting)
 - `/RateLimiting` — rate limiting logic & configuration
@@ -118,6 +119,17 @@ Redis is used to optimize read-heavy task queries using a cache-aside strategy.
 - Caching is treated as an **implementation detail**, not part of the service contract
 
 Cache key format: `tasks:{userId}:{queryHash}`
+
+### Cache Invalidation (Write Path)
+To ensure consistency between cache and database:
+
+- Cache entries are invalidated on:
+    - `POST /tasks`
+    - `PUT /tasks/{id}`
+    - `DELETE /tasks/{id}`
+- Full user-scoped invalidation is used to keep pagination safe
+- Redis failures are handled gracefully without impacting writes
+- Database remains the source of truth
 
 **Cache Observability**
 
@@ -210,7 +222,7 @@ This design keeps middleware generic while allowing endpoints to explicitly opt 
 - `/redis-health` — Redis connectivity and read/write validation
 - `/db-tasks-count` — useful for debugging DB reads/writes 
 - `/db-test-task` — creates a test task in the DB
-- `/debug/tasks` — view top N sorted tasks
+- `/debug/tasks?take=N` — view top N sorted tasks
 
 ### Structured Logging (Serilog)
 
@@ -235,9 +247,8 @@ This design keeps middleware generic while allowing endpoints to explicitly opt 
 
 ### Docker-ready (database)
 
-- Includes `docker-compose.yml` for running PostgreSQL and Redis locally
-- Database inspected and verified via Docker exec + `psql`
-- Includes Redis container for local caching and performance testing
+- Includes `docker-compose.yml` for PostgreSQL and Redis
+- Supports local performance and caching tests
 
 ---
 
@@ -324,6 +335,8 @@ TaskManager/
 │   ├── ITaskService.cs
 │   ├── DbTaskService.cs
 │   ├── InMemoryTaskService.cs
+│   ├── ICacheService.cs
+│   ├── RedisCacheService.cs
 │   ├── IAuthService.cs
 │   ├── AuthService.cs
 │   └── JwtTokenGenerator.cs
