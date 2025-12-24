@@ -23,6 +23,8 @@ This project demonstrates:
 - Redis-based caching for read-heavy endpoints
 - Cache-aside strategy with observability via response headers
 - Cache invalidation on write operations with graceful fallback
+- Consistent API response envelope for success and error cases
+- Structured validation errors with field-level messages
 
 This service exposes REST APIs for:
 
@@ -52,7 +54,7 @@ retaining structure and clarity.
 - `/Validators` — FluentValidation validators
 - `/Services` — business logic, caching abstraction + implementations
 - `/Endpoints` — grouped API endpoint mappings
-- `/Middleware` — cross-cutting middleware (rate limiting)
+- `/Middleware` — cross-cutting middleware (rate limiting, exceptional handling)
 - `/RateLimiting` — rate limiting logic & configuration
 - `/Helpers` — shared helper & extension logic
 - `/Data` — EF Core DbContext + SQL schema 
@@ -63,6 +65,22 @@ retaining structure and clarity.
 All endpoints use DTOs for clean separation between database models and public API responses 
 and to prevent leaking internal DB structures.
 
+All responses are wrapped in a consistent API envelope:
+
+```json
+
+{
+  "success": true | false,
+  "data": ...,
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human readable message",
+    "details": { }
+  }
+}
+
+```
+
 ### Request Validation (FluentValidation)
 
 Centralized, enterprise-grade request validation using FluentValidation.
@@ -70,7 +88,7 @@ Centralized, enterprise-grade request validation using FluentValidation.
 - Separate validators for create & update requests
 - No manual validation logic in endpoints
 - Consistent `400 Bad Request` responses
-- Structured validation error format (ProblemDetails)
+- Structured validation error format with field-level messages
 
 Task Validation Rules
 - Title: required, 2–100 characters
@@ -102,15 +120,16 @@ Supported features:
 - Direction: `Asc` / `Desc` 
 - Enum-based strict validation for sort fields
 - Stable secondary sorting (`Id`)  
-- Page clamping for invalid pages  
+- Strict pagination validation
 - Maximum page size enforcement
+- Out-of-range pages return empty results
 
 All logic is handled entirely in the **service layer**, keeping endpoints thin and focused on HTTP concerns only.
 
 ### Redis Caching (Read Path Optimization)
 Redis is used to optimize read-heavy task queries using a cache-aside strategy.
 
-- Implemented for GET /tasks
+- Implemented for `GET /tasks`
 - User-scoped caching to prevent data leakage
 - Cache keys include pagination, sorting, and filters
 - Cached values store **final DTO responses**, not EF entities
@@ -148,7 +167,7 @@ Stateless JWT authentication is implemented to support user registration and log
 - `POST /auth/register` — register a new user
 - `POST /auth/login` — authenticate user and issue JWT access token
 - Password hashing using `PasswordHasher<T>`
-- JWT generation using HS256
+- JWT generation using `HS256`
 - Token claims include `nameidentifier (UserId)`, `email`, `jti`, and `expiration`
 
 ### Refresh Tokens
@@ -292,6 +311,7 @@ TaskManager/
 │   └── RefreshToken.cs
 │
 ├── Dto/
+│   ├── ApiResponse.cs
 │   ├── Auth/
 │   │   ├── RegisterRequest.cs
 │   │   ├── LoginRequest.cs

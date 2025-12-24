@@ -10,30 +10,8 @@ public static class TaskEndpoints
 {
     public static IEndpointRouteBuilder MapTaskEndpoints(this IEndpointRouteBuilder app)
     {
-        /// <summary>
-        /// GET /tasks
-        /// Returns a paginated + sorted + filterable list of tasks.
-        /// Query Params:
-        /// - isCompleted (bool?) : filter by completion
-        /// - page (int?) : 1-based page number
-        /// - pageSize (int?) : size per page (max 50)
-        /// - sortBy (string?) : CreatedAt | UpdatedAt | Title
-        /// - sortDir (string?) : Asc | Desc
-        /// 
-        /// Response:
-        /// {
-        ///   items: TaskResponse[],
-        ///   page: number,
-        ///   pageSize: number,
-        ///   totalCount: number,
-        ///   totalPages: number,
-        ///   hasNextPage: bool,
-        ///   hasPreviousPage: bool
-        /// }
-        /// </summary>
-
         // GET /tasks - paginated, filter by isCompleted, sorted by CreatedAt desc
-        app.MapGet("/tasks", (bool? isCompleted, int? page, int? pageSize, string? sortBy, string? sortDir, HttpContext http, ITaskService tasks) =>
+        app.MapGet("/tasks", async (bool? isCompleted, int? page, int? pageSize, string? sortBy, string? sortDir, HttpContext http, ITaskService tasks) =>
         {
             var userId = http.User.GetUserId();
 
@@ -78,16 +56,32 @@ public static class TaskEndpoints
             }
 
             // Normalize pagination (defaults + limits)
-            var (normalizedPage, normalizedPageSize) = PaginationHelper.Normalize(page, pageSize);
+            int normalizedPage, normalizedPageSize;
+            
+            try
+            {
+                (normalizedPage, normalizedPageSize) = PaginationHelper.ValidateAndNormalize(page, pageSize);
+            }
+            catch(ArgumentException ex)
+            {
+                return Results.BadRequest(new
+                {
+                    error = ex.Message
+                });
+            }
 
             // Fetch paginated, filtered, sorted tasks
-            var response = tasks.GetTasks(userId, isCompleted, normalizedPage, normalizedPageSize, currentSortBy, currentDir);
+            var response = await tasks.GetTasksAsync(userId, isCompleted, normalizedPage, normalizedPageSize, currentSortBy, currentDir);
 
             // Read cache info set by service
             var isCacheHit = http.Items["CacheHit"] as bool? == true;
             http.Response.Headers["X-Cache"] = isCacheHit ? "HIT" : "MISS";
 
-            return Results.Ok(response);
+            return Results.Ok(new ApiResponse<PagedResponse<TaskResponse>>(
+                Success: true,
+                Data: response,
+                Error: null
+            ));
         })
         .RequireAuthorization()
         .WithName("GetTasks");
@@ -98,7 +92,18 @@ public static class TaskEndpoints
             var userId = http.User.GetUserId();
             var task = tasks.GetById(userId, id);
 
-            if (task is null) return Results.NotFound();
+            if (task is null)
+            {
+                return Results.NotFound(new ApiResponse<TaskResponse>(
+                    Success: false,
+                    Data: null,
+                    Error: new ApiError
+                    (
+                        Code: "TASK_NOT_FOUND",
+                        Message: $"Task with ID {id} not found."
+                    )
+                ));
+            }
 
             var response = new TaskResponse(
                 task.Id,
@@ -109,7 +114,11 @@ public static class TaskEndpoints
                 task.UpdatedAt
             );
 
-            return Results.Ok(response); 
+            return Results.Ok(new ApiResponse<TaskResponse>(
+                Success: true,
+                Data: response,
+                Error: null
+            ));
         })
         .RequireAuthorization()
         .WithName("GetTaskById");
@@ -121,7 +130,15 @@ public static class TaskEndpoints
 
             if (!validationResult.IsValid)
             {
-                return Results.ValidationProblem(validationResult.ToDictionary());
+                return Results.BadRequest(new ApiResponse<object>(
+                    Success: false,
+                    Data: null,
+                    Error: new ApiError(
+                        Code: "VALIDATION_ERROR",
+                        Message: "One or more validation errors occurred",
+                        Details: validationResult.ToDictionary()
+                    )
+                ));
             }
 
             var userId = http.User.GetUserId();
@@ -136,7 +153,13 @@ public static class TaskEndpoints
                 created.UpdatedAt
             );
 
-            return Results.Created($"/tasks/{created.Id}", response);
+            return Results.Created($"/tasks/{created.Id}", 
+                new ApiResponse<TaskResponse>(
+                    Success: true,
+                    Data: response,
+                    Error: null
+                )
+            );
         })
         .RequireAuthorization()
         .WithMetadata(new RequireRateLimitingAttribute())
@@ -150,14 +173,31 @@ public static class TaskEndpoints
 
             if (!validationResult.IsValid)
             {
-                return Results.ValidationProblem(validationResult.ToDictionary());
+                return Results.BadRequest(new ApiResponse<object>(
+                    Success: false,
+                    Data: null,
+                    Error: new ApiError(
+                        Code: "VALIDATION_ERROR",
+                        Message: "One or more validation errors occurred",
+                        Details: validationResult.ToDictionary()
+                    )
+                ));
             }
 
             var userId = http.User.GetUserId();
             var updated = tasks.Update(userId, id, request.Title, request.Description, request.IsCompleted);
             
             if(updated is null)
-                return Results.NotFound();
+            {
+                return Results.NotFound(new ApiResponse<TaskResponse>(
+                    Success: false,
+                    Data: null,
+                    Error: new ApiError(
+                        "TASK_NOT_FOUND",
+                        "Task not found"
+                    )
+                ));
+            }
 
             var response = new TaskResponse(
                 updated!.Id,
@@ -168,7 +208,11 @@ public static class TaskEndpoints
                 updated.UpdatedAt
             );
 
-            return Results.Ok(response);
+            return Results.Ok(new ApiResponse<TaskResponse>(
+                Success: true,
+                Data: response,
+                Error: null
+            ));
         })
         .RequireAuthorization()
         .WithMetadata(new RequireRateLimitingAttribute())
@@ -181,7 +225,23 @@ public static class TaskEndpoints
             var userId = http.User.GetUserId();
             var deleted = tasks.Delete(userId, id);
 
-            return deleted ? Results.NoContent() : Results.NotFound();
+            if (!deleted)
+            {
+                return Results.NotFound(new ApiResponse<object>(
+                    Success: false,
+                    Data: null,
+                    Error: new ApiError(
+                        "TASK_NOT_FOUND",
+                        "Task not found"
+                    )
+                ));
+            }
+
+            return Results.Ok(new ApiResponse<object>(
+                Success: true,
+                Data: null,
+                Error: null
+            ));
         })
         .RequireAuthorization()
         .WithMetadata(new RequireRateLimitingAttribute())

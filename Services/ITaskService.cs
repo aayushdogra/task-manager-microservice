@@ -10,5 +10,5 @@ public interface ITaskService
     TaskItem Create(Guid userId, string title, string? description);
     TaskItem? Update(Guid userId, int id, string title, string? description, bool isCompleted);
     bool Delete(Guid userId, int id);
-    PagedResponse<TaskResponse> GetTasks(Guid userId, bool? isCompleted, int page, int pageSize, TaskSortBy sortBy, SortDirection sortDir);
+    Task<PagedResponse<TaskResponse>> GetTasksAsync(Guid userId, bool? isCompleted, int page, int pageSize, TaskSortBy sortBy, SortDirection sortDir);
 }

@@ -108,7 +108,7 @@ public class DbTaskService(
 
     /* Cache paginated task responses per user using Redis with a cache-aside strategy and short TTL to
     balance performance and data freshness. */
-    public PagedResponse<TaskResponse> GetTasks(Guid userId, bool? isCompleted, int page, int pageSize, TaskSortBy sortBy, SortDirection sortDir)
+    public async Task<PagedResponse<TaskResponse>> GetTasksAsync(Guid userId, bool? isCompleted, int page, int pageSize, TaskSortBy sortBy, SortDirection sortDir)
     {
         try
         {
@@ -117,8 +117,7 @@ public class DbTaskService(
             var cacheKey = $"tasks:{userId}:{queryKey}";
 
             // Try Cache
-            var cachedResponse = _cache.GetAsync<PagedResponse<TaskResponse>>(cacheKey)
-                                       .GetAwaiter().GetResult();
+            var cachedResponse = await _cache.GetAsync<PagedResponse<TaskResponse>>(cacheKey);
 
             if (cachedResponse != null)
             {
@@ -141,16 +140,20 @@ public class DbTaskService(
             query = TaskSortingHelper.ApplySorting(query, sortBy, sortDir);
 
             // Total count before pagination
-            var totalCount = query.Count();
+            var totalCount = await query.CountAsync();
 
             // Page clamping
             var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
 
-            var pageToUse = totalPages == 0 ? 1 : Math.Clamp(page, 1, totalPages);
+            // If page is beyond range, return empty page
+            if (page > totalPages && totalPages > 0)
+                return new PagedResponse<TaskResponse>(Array.Empty<TaskResponse>(), page, pageSize, totalCount);
+
+            //var pageToUse = totalPages == 0 ? 1 : Math.Clamp(page, 1, totalPages);
 
             // Pagination
-            var items = query
-                .Skip((pageToUse - 1) * pageSize)
+            var items = await query
+                .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .Select(t => new TaskResponse(
                     t.Id,
@@ -160,9 +163,9 @@ public class DbTaskService(
                     t.CreatedAt,
                     t.UpdatedAt
                 ))
-                .ToList();
+                .ToListAsync();
 
-            var response =  new PagedResponse<TaskResponse>(items, pageToUse, pageSize, totalCount);
+            var response =  new PagedResponse<TaskResponse>(items, page, pageSize, totalCount);
 
             // Store in cache, short TTL for safety
             _ = _cache.SetAsync(cacheKey, response, TimeSpan.FromMinutes(2));

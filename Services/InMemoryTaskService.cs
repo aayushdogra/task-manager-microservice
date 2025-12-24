@@ -56,7 +56,7 @@ public class InMemoryTaskService : ITaskService
         return true;
     }
 
-    public PagedResponse<TaskResponse> GetTasks(Guid userId, bool? isCompleted, int page, int pageSize, TaskSortBy sortBy, SortDirection sortDir)
+    public Task<PagedResponse<TaskResponse>> GetTasksAsync(Guid userId, bool? isCompleted, int page, int pageSize, TaskSortBy sortBy, SortDirection sortDir)
     {
         IQueryable<TaskItem> query = _tasks.Where(t => t.UserId == userId).AsQueryable();
 
@@ -73,11 +73,16 @@ public class InMemoryTaskService : ITaskService
         // Page clamping
         var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
 
-        var pageToUse = totalPages == 0 ? 1 : Math.Clamp(page, 1, totalPages);
+        if (page > totalPages && totalPages > 0)
+        {
+            return Task.FromResult(
+                new PagedResponse<TaskResponse>(Array.Empty<TaskResponse>(), page, pageSize, totalCount)
+            );
+        }
 
         // Pagination
         var items = query
-            .Skip((pageToUse - 1) * pageSize)
+            .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(t => new TaskResponse(
                 t.Id,
@@ -89,11 +94,13 @@ public class InMemoryTaskService : ITaskService
             ))
             .ToList();
 
-        return new PagedResponse<TaskResponse>(
-            items,
-            pageToUse,
-            pageSize,
-            totalCount
+        return Task.FromResult(
+            new PagedResponse<TaskResponse>(
+                items,
+                page,
+                pageSize,
+                totalCount
+            )
         );
     }
 }
