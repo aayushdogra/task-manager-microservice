@@ -125,6 +125,7 @@ Supported features:
 - Out-of-range pages return empty results
 
 All logic is handled entirely in the **service layer**, keeping endpoints thin and focused on HTTP concerns only.
+Pagination navigation links are exposed via standard `HTTP Link headers (self, next, prev)`.
 
 ### Redis Caching (Read Path Optimization)
 Redis is used to optimize read-heavy task queries using a cache-aside strategy.

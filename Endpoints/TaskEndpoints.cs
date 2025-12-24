@@ -73,6 +73,24 @@ public static class TaskEndpoints
             // Fetch paginated, filtered, sorted tasks
             var response = await tasks.GetTasksAsync(userId, isCompleted, normalizedPage, normalizedPageSize, currentSortBy, currentDir);
 
+            var request = http.Request;
+            var baseUrl = $"{request.Scheme}://{request.Host}{request.Path}";
+
+            var links = new List<string>();
+
+            // Self link
+            links.Add($"<{baseUrl}?page={response.Page}&pageSize={response.PageSize}>; rel=\"self\"");
+
+            // Next page link
+            if (response.HasNextPage)
+                links.Add($"<{baseUrl}?page={response.Page + 1}&pageSize={response.PageSize}>; rel=\"next\"");
+
+            // Previous page link
+            if (response.HasPreviousPage)
+                links.Add($"<{baseUrl}?page={response.Page - 1}&pageSize={response.PageSize}>; rel=\"prev\"");
+
+            http.Response.Headers.Append("Link", string.Join(", ", links));
+
             // Read cache info set by service
             var isCacheHit = http.Items["CacheHit"] as bool? == true;
             http.Response.Headers["X-Cache"] = isCacheHit ? "HIT" : "MISS";
