@@ -332,7 +332,10 @@ Up (healthy)
 TaskManager/
 ├── Program.cs
 ├── appsettings.json
-├── appsettings.Development.json
+│
+├── Dockerfile
+├── docker-compose.yml
+├── README.md
 │
 ├── Models/
 │   ├── TaskItem.cs
@@ -376,9 +379,11 @@ TaskManager/
 │   └── RequireUserRateLimitingAttribute.cs
 │
 ├── Helpers/
+│   ├── ApiResults.cs
+│   ├── PaginationHelper.cs
 │   ├── TaskSortingHelper.cs
-│   ├── ValidationExtensions.cs
-│   └── UserClaimsExtensions.cs
+│   ├── UserClaimsExtensions.cs
+│   └── ValidationExtensions.cs
 │
 ├── Services/
 │   ├── ITaskService.cs
@@ -397,8 +402,6 @@ TaskManager/
 ├── logs/
 │   └── log-YYYYMMDD.txt
 │
-├── docker-compose.yml
-├── README.md
 └── TaskManager.csproj
 
 ```
