@@ -6,6 +6,9 @@ public static class ValidationExtensions
 {
     public static Dictionary<string, string[]> ToDictionary(this ValidationResult result)
     {
+        if (result == null || result.Errors.Count == 0)
+            return [];
+
         return result.Errors
             .GroupBy(e => e.PropertyName)
             .ToDictionary(

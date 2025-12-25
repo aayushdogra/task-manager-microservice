@@ -14,8 +14,13 @@ public static class HealthEndpoints
     {
         app.MapGet("/health", () =>
         {
-            return Results.Ok(new { status = "ok" });
+            return Results.Ok(new 
+            { 
+                status = "ok",
+                message = "Task Manager Microservice is running"
+            });
         })
+        .WithTags("v1", "Health")
         .WithName("HealthCheck");
 
         app.MapGet("/db-health", async (TasksDbContext db) =>
@@ -24,7 +29,11 @@ public static class HealthEndpoints
             {
                 var canConnect = await db.Database.CanConnectAsync();
                 return canConnect
-                    ? Results.Ok(new { status = "ok" })
+                    ? Results.Ok(new 
+                    { 
+                        status = "ok",
+                        message = "Database connection successful"
+                    })
                     : Results.Problem("Database not reachable");
             }
             catch (Exception ex)
@@ -32,6 +41,7 @@ public static class HealthEndpoints
                 return Results.Problem($"Database error: {ex.Message}");
             }
         })
+        .WithTags("v1", "Health")
         .WithName("DatabaseHealthCheck");
 
         app.MapGet("/redis-health", (IConnectionMultiplexer redis) =>
@@ -42,7 +52,11 @@ public static class HealthEndpoints
                 redisDB.StringSet("health_check", "ok");
                 var value = redisDB.StringGet("health_check");
 
-                return value == "ok" ? Results.Ok(new { status = "ok" })
+                return value == "ok" ? Results.Ok(new 
+                { 
+                    status = "ok",
+                    message = "Redis connection successful"
+                })
                     : Results.Problem("Redis not responding correctly");
             }
             catch(Exception ex)
@@ -50,6 +64,7 @@ public static class HealthEndpoints
                 return Results.Problem($"Redis error: {ex.Message}");
             }
         })
+        .WithTags("v1", "Health")
         .WithName("RedisHealthCheck");
 
         // Debug endpoint to get count of tasks in the database
@@ -58,6 +73,7 @@ public static class HealthEndpoints
             var count = await db.Tasks.CountAsync();
             return Results.Ok(new { tasksInDb = count });
         })
+        .WithTags("v1", "Health")
         .WithName("DatabaseTasksCount");
 
         // Debug endpoint to test create tasks in the database
@@ -68,6 +84,7 @@ public static class HealthEndpoints
             return Results.Ok(created);
         })
         .RequireAuthorization()
+        .WithTags("v1", "Health")
         .WithName("DbTestCreateTask");
 
         // Debug endpoint to get top N tasks with sorting options
@@ -89,6 +106,7 @@ public static class HealthEndpoints
 
             return Results.Ok(top);
         })
+        .WithTags("v1", "Health")
         .WithName("Debug_GetTopTasks");
 
         return app;

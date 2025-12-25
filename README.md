@@ -74,7 +74,7 @@ All responses are wrapped in a consistent API envelope:
   "data": ...,
   "error": {
     "code": "ERROR_CODE",
-    "message": "Human readable message",
+    "message": "Message",
     "details": { }
   }
 }
@@ -157,16 +157,12 @@ Cache behavior is exposed via HTTP response headers:
 
 `X-Cache: HIT | MISS`
 
-- Enables easy debugging and verification
-- Keeps API response payload unchanged
-- Avoids leaking infrastructure concerns into DTOs
-
 ### JWT Authentication
 
 Stateless JWT authentication is implemented to support user registration and login.
 
-- `POST /auth/register` — register a new user
-- `POST /auth/login` — authenticate user and issue JWT access token
+- `POST /auth/register`
+- `POST /auth/login`
 - Password hashing using `PasswordHasher<T>`
 - JWT generation using `HS256`
 - Token claims include `nameidentifier (UserId)`, `email`, `jti`, and `expiration`
@@ -176,8 +172,8 @@ Stateless JWT authentication is implemented to support user registration and log
 Database-backed refresh tokens are implemented to support long-lived authentication.
 
 - `POST /auth/refresh` — issue a new access token using a valid refresh token
-- Refresh tokens are securely generated and stored in PostgreSQL
-- Tokens include expiration and revocation support
+- Refresh tokens are stored in PostgreSQL
+- Expiration and revocation supported
 - Access tokens remain stateless and short-lived
 - Invalid, expired, or revoked refresh tokens return `401 Unauthorized`
 
@@ -185,24 +181,19 @@ Database-backed refresh tokens are implemented to support long-lived authenticat
 
 A dedicated endpoint is provided to fetch the currently authenticated user’s profile information.
 
-- `GET /me` — returns user info based on JWT claims
-- User data is fetched from the database to ensure consistency
-- Endpoint is protected via `.RequireAuthorization()`
+- `GET /me` returns authenticated user info
+- Data fetched from DB to ensure consistency
+- Protected via `.RequireAuthorization()`
 
-### Logout Semantics (Important)
-- POST /auth/logout — logout revokes refresh tokens only
-- Access tokens remain valid until expiry (by design)
-- Logout is idempotent: Invalid or already-revoked tokens still return 204 No Content
+### Logout Semantics
+- `POST /auth/logout` revokes refresh tokens
+- Access tokens remain valid until expiry
+- Logout is idempotent (safe to call multiple times)
 
 ### Authorization (API Protection)
-
 Authorization is enforced at endpoint level using Minimal API metadata.
 
-- Read / Write endpoints require authentication
-- Prevents unauthorized task creation, updates, and deletions
-- Authorization is enforced via JWT middleware
-
-**Protected Endpoints:**
+**Protected Endpoints include:**
 - `GET /tasks`
 - `GET /tasks/{id}`
 - `POST /tasks`
@@ -216,84 +207,121 @@ Authorization is enforced at endpoint level using Minimal API metadata.
 
 ### Rate Limiting & Abuse Protection
 
-A middleware-based rate limiting mechanism is implemented to protect the API from abuse and brute-force attacks.
-
 - In-memory fixed window rate limiting
-- Configured as 100 requests / 10 minutes
-- Implemented as middleware
+- Configured as **100 requests / 10 minutes**
+- Middleware-based implementation
 - Applied selectively using endpoint metadata
-- Supports **IP-based and per-user rate limiting**
-- Returns `429 Too Many Requests` with a friendly JSON error
-- Adds rate limit headers:
+- Supports **IP-based and per-user limiting**
+- Returns `429 Too Many Requests`
+- Includes:
     - `X-RateLimit-Limit`
     - `X-RateLimit-Remaining`
 
-**Rate limiting strategy:**
-- Auth endpoints are rate limited by **IP**
-- Authenticated write endpoints are rate limited **per user (with IP fallback)**
-- Read-only, health, and debug endpoints are excluded
-
-This design keeps middleware generic while allowing endpoints to explicitly opt into rate limiting.
-
 ### Health monitoring & Debugging
 
-- `/health` — service health  
-- `/db-health` — PostgreSQL connectivity 
-- `/redis-health` — Redis connectivity and read/write validation
-- `/db-tasks-count` — useful for debugging DB reads/writes 
-- `/db-test-task` — creates a test task in the DB
-- `/debug/tasks?take=N` — view top N sorted tasks
+- `/health` service liveness 
+- `/db-health` PostgreSQL connectivity
+- `/redis-health` Redis connectivity
+- `/db-tasks-count`debugging DB visibility 
+- `/db-test-task` inserts test task
+- `/debug/tasks?take=N` — fetch top N sorted tasks
 
 ### Structured Logging (Serilog)
 
 - Centralized logging using Serilog  
 - Console + rolling file logs (`logs/log-*.txt`)  
-- Supports production overrides and environment-based logging levels  
+- Environment-based configuration
+- Safe production logging defaults
 
 ### Global Exception Handling
 
-- Centralized exception handling via middleware
-- Maps domain exceptions to correct HTTP status codes (`400`, `401`, `500`)
+- Centralized exception handling middleware
+- Maps domain errors to HTTP status codes (`400`, `401`, `500`)
 - Logs all unhandled exceptions with stack traces 
-- Prevents stack trace leakage in production
+- Prevents stack traces from leaking to clients
 - Returns clean JSON error responses:
 
 ```json
 {
-  "error": "An unexpected error occurred.",
-  "details": "Optional message (dev only)"
+    "success": true | false,
+    "data": ...,
+    "error": {
+        "code": "ERROR_CODE",
+        "message": "Message",
+        "details": { }
+    },
+    "meta": null
 }
 ```
 
-### Docker-ready (database)
+---
 
-- Includes `docker-compose.yml` for PostgreSQL and Redis
-- Supports local performance and caching tests
+## 🐳 Docker (API + PostgreSQL + Redis)
+The project is fully containerized and can be run using **Docker Compose**, including:
+
+- API service
+- PostgreSQL database
+- Redis cache
+- Health checks
+- Environment-based configuration
+
+Run everything locally:
+
+```bash
+docker compose up --build 
+```
+This starts:
+- Task Manager API
+- PostgreSQL
+- Redis
 
 ---
 
-## 🐳 Docker (PostgreSQL + Redis)
+### API service
+- Base URL: `http://localhost:8080`
+- Health: `GET /api/v1/health`
+- Database health: `GET /api/v1/db-health`
+- Redis health: `GET /api/v1/redis-`health`
 
-To start the PostgreSQL and Redis locally:
+Docker health checks ensure the API is marked healthy only after startup completes.
 
-```bash
-docker compose up -d 
+---
+
+### Environment configuration (`.env`)
+The project supports environment-based configuration via a .env file.
+
+```env
+
+ASPNETCORE_ENVIRONMENT=Docker
+
+POSTGRES_DB=tasks_db
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+
+CONNECTIONSTRINGS__TASKSDB=Host=postgres;Port=5432;Database=tasks_db;Username=postgres;Password=postgres
+
+REDIS__CONNECTIONSTRING=redis:6379
+
 ```
-This launches the following services:
 
-**PostgreSQL** (`tasks_db`)
-- Host: `localhost`
-- Port: `5432`
-- User: `postgres`
-- Password: `postgres`
-- Database: `tasks_db`
+---
 
-**Redis**
-- Host: `localhost`
-- Port: `6379`
-- Used for caching read-heavy endpoints
+### Docker health checks
+Each container defines its own health check:
 
-API connects to the DB via EF Core and Redis via StackExchange.Redis using configuration from `appsettings.json`.
+- API → `/api/v1/health`
+- PostgreSQL → `pg_isready`
+- Redis → `redis-cli ping`
+
+Verify health status:
+```bash
+docker ps
+```
+
+Expected output:
+```txt
+Up (healthy)
+```
 
 ---
 

@@ -1,49 +1,49 @@
-# Ignore build output folders
+# Build output
 bin/
 obj/
 
-# Ignore logs
+# Logs
 logs/
+*.log
 
-# Ignore Visual Studio files
+# Visual Studio / IDE
 .vs/
 .vscode/
-
-# User-specific files
-*.user
+.idea/
 *.suo
+*.user
 *.userosscache
 *.userprefs
+*.sln.iml
 
-# Backup & temporary files
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temp / cache
 *.tmp
 *.bak
 *.ncb
-*.log
 *.tlog
 *.cache
-*.pdb
 
-# Build artifacts
-*.dll
-*.exe
-*.app
-*.pyc
-
-# ASP.NET specific
-appsettings.Development.json
-
-# NuGet Packages
-*.nupkg
+# NuGet
 packages/
+*.nupkg
 
-# dotnet watcher temp
-*.vscode/.ionide
-.idea/
+# ASP.NET / .NET secrets
+appsettings.Development.json
+secrets.json
+*.pfx
+*.cer
+*.key
 
 # Environment variables
 .env
 
-# JetBrains Rider (optional)
-.idea/
-*.sln.iml
+# Test & coverage
+TestResults/
+coverage/
+
+# Docker
+.dockerignore

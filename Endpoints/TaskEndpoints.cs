@@ -29,13 +29,8 @@ public static class TaskEndpoints
             if (!string.IsNullOrWhiteSpace(sortBy))
             {
                 if (!Enum.TryParse<TaskSortBy>(sortBy.Trim(), true, out var parsedSortBy))
-                {
-                    return Results.BadRequest(new
-                    {
-                        error = "Invalid sortBy parameter.",
-                        allowedValues = allowedSortBy
-                    });
-                }
+                    return ApiResults.BadRequest("INVALID_SORT_BY", "Invalid sortBy parameter.", allowedSortBy);
+                
                 currentSortBy = parsedSortBy;
             }
 
@@ -45,13 +40,8 @@ public static class TaskEndpoints
             if (!string.IsNullOrWhiteSpace(sortDir))
             {
                 if (!Enum.TryParse<SortDirection>(sortDir.Trim(), true, out var parsedDir))
-                {
-                    return Results.BadRequest(new
-                    {
-                        error = "Invalid sortDir parameter.",
-                        allowedValues = allowedSortDir
-                    });
-                }
+                    return ApiResults.BadRequest("INVALID_SORT_DIR", "Invalid sortDir parameter.", allowedSortDir);
+                
                 currentDir = parsedDir;
             }
 
@@ -64,10 +54,7 @@ public static class TaskEndpoints
             }
             catch(ArgumentException ex)
             {
-                return Results.BadRequest(new
-                {
-                    error = ex.Message
-                });
+                return ApiResults.BadRequest("PAGINATION_ERROR", ex.Message);
             }
 
             // Fetch paginated, filtered, sorted tasks
@@ -76,10 +63,11 @@ public static class TaskEndpoints
             var request = http.Request;
             var baseUrl = $"{request.Scheme}://{request.Host}{request.Path}";
 
-            var links = new List<string>();
-
-            // Self link
-            links.Add($"<{baseUrl}?page={response.Page}&pageSize={response.PageSize}>; rel=\"self\"");
+            var links = new List<string>
+            {
+                // Self link
+                $"<{baseUrl}?page={response.Page}&pageSize={response.PageSize}>; rel=\"self\""
+            };
 
             // Next page link
             if (response.HasNextPage)
@@ -95,13 +83,10 @@ public static class TaskEndpoints
             var isCacheHit = http.Items["CacheHit"] as bool? == true;
             http.Response.Headers["X-Cache"] = isCacheHit ? "HIT" : "MISS";
 
-            return Results.Ok(new ApiResponse<PagedResponse<TaskResponse>>(
-                Success: true,
-                Data: response,
-                Error: null
-            ));
+            return ApiResults.Ok(response);
         })
         .RequireAuthorization()
+        .WithTags("v1", "Tasks")
         .WithName("GetTasks");
 
         // GET /tasks/{id} - get single task by id
@@ -111,17 +96,8 @@ public static class TaskEndpoints
             var task = tasks.GetById(userId, id);
 
             if (task is null)
-            {
-                return Results.NotFound(new ApiResponse<TaskResponse>(
-                    Success: false,
-                    Data: null,
-                    Error: new ApiError
-                    (
-                        Code: "TASK_NOT_FOUND",
-                        Message: $"Task with ID {id} not found."
-                    )
-                ));
-            }
+                return ApiResults.NotFound("TASK_NOT_FOUND", $"Task with ID {id} not found.");
+            
 
             var response = new TaskResponse(
                 task.Id,
@@ -132,13 +108,10 @@ public static class TaskEndpoints
                 task.UpdatedAt
             );
 
-            return Results.Ok(new ApiResponse<TaskResponse>(
-                Success: true,
-                Data: response,
-                Error: null
-            ));
+            return ApiResults.Ok(response);
         })
         .RequireAuthorization()
+        .WithTags("v1", "Tasks")
         .WithName("GetTaskById");
 
         // POST /tasks - create new task
@@ -147,17 +120,7 @@ public static class TaskEndpoints
             var validationResult = await validator.ValidateAsync(request);
 
             if (!validationResult.IsValid)
-            {
-                return Results.BadRequest(new ApiResponse<object>(
-                    Success: false,
-                    Data: null,
-                    Error: new ApiError(
-                        Code: "VALIDATION_ERROR",
-                        Message: "One or more validation errors occurred",
-                        Details: validationResult.ToDictionary()
-                    )
-                ));
-            }
+                return ApiResults.ValidationError(validationResult.ToDictionary());
 
             var userId = http.User.GetUserId();
             var created = tasks.Create(userId, request.Title, request.Description);
@@ -171,17 +134,12 @@ public static class TaskEndpoints
                 created.UpdatedAt
             );
 
-            return Results.Created($"/tasks/{created.Id}", 
-                new ApiResponse<TaskResponse>(
-                    Success: true,
-                    Data: response,
-                    Error: null
-                )
-            );
+            return ApiResults.Created($"/tasks/{created.Id}", response);
         })
         .RequireAuthorization()
         .WithMetadata(new RequireRateLimitingAttribute())
         .WithMetadata(new RequireUserRateLimitingAttribute())
+        .WithTags("v1", "Tasks")
         .WithName("CreateTask");
 
         // PUT /tasks/{id} - update existing task
@@ -190,32 +148,15 @@ public static class TaskEndpoints
             var validationResult = await validator.ValidateAsync(request);
 
             if (!validationResult.IsValid)
-            {
-                return Results.BadRequest(new ApiResponse<object>(
-                    Success: false,
-                    Data: null,
-                    Error: new ApiError(
-                        Code: "VALIDATION_ERROR",
-                        Message: "One or more validation errors occurred",
-                        Details: validationResult.ToDictionary()
-                    )
-                ));
-            }
+                return ApiResults.ValidationError(validationResult.ToDictionary());
+            
 
             var userId = http.User.GetUserId();
             var updated = tasks.Update(userId, id, request.Title, request.Description, request.IsCompleted);
             
             if(updated is null)
-            {
-                return Results.NotFound(new ApiResponse<TaskResponse>(
-                    Success: false,
-                    Data: null,
-                    Error: new ApiError(
-                        "TASK_NOT_FOUND",
-                        "Task not found"
-                    )
-                ));
-            }
+                return ApiResults.NotFound("TASK_NOT_FOUND", "Task not found");
+            
 
             var response = new TaskResponse(
                 updated!.Id,
@@ -226,15 +167,12 @@ public static class TaskEndpoints
                 updated.UpdatedAt
             );
 
-            return Results.Ok(new ApiResponse<TaskResponse>(
-                Success: true,
-                Data: response,
-                Error: null
-            ));
+            return ApiResults.Ok(response);
         })
         .RequireAuthorization()
         .WithMetadata(new RequireRateLimitingAttribute())
         .WithMetadata(new RequireUserRateLimitingAttribute())
+        .WithTags("v1", "Tasks")
         .WithName("UpdateTask");
 
         // DELETE /tasks/{id} - delete task by id
@@ -244,26 +182,15 @@ public static class TaskEndpoints
             var deleted = tasks.Delete(userId, id);
 
             if (!deleted)
-            {
-                return Results.NotFound(new ApiResponse<object>(
-                    Success: false,
-                    Data: null,
-                    Error: new ApiError(
-                        "TASK_NOT_FOUND",
-                        "Task not found"
-                    )
-                ));
-            }
+                return ApiResults.NotFound("TASK_NOT_FOUND", "Task not found");
+            
 
-            return Results.Ok(new ApiResponse<object>(
-                Success: true,
-                Data: null,
-                Error: null
-            ));
+            return ApiResults.NoContent();
         })
         .RequireAuthorization()
         .WithMetadata(new RequireRateLimitingAttribute())
         .WithMetadata(new RequireUserRateLimitingAttribute())
+        .WithTags("v1", "Tasks")
         .WithName("DeleteTask");
 
         return app;

@@ -1,16 +1,18 @@
+using FluentValidation;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Serilog;
+using StackExchange.Redis;
+using System.Text;
 using TaskManager.Data;
+using TaskManager.Dto;
 using TaskManager.Endpoints;
-using TaskManager.Services;
-using TaskManager.Validators;
+using TaskManager.Helpers;
 using TaskManager.Middleware;
 using TaskManager.RateLimiting;
-using Serilog;
-using FluentValidation;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
-using StackExchange.Redis;
+using TaskManager.Services;
+using TaskManager.Validators;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,7 +24,7 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog();
 
-builder.WebHost.UseUrls("http://localhost:5156", "https://localhost:7156");
+//builder.WebHost.UseUrls("http://localhost:5156", "https://localhost:7156");
 
 // Add services to the container.
 builder.Services.AddOpenApi();
@@ -106,49 +108,41 @@ try
     {
         errorApp.Run(async context =>
         {
-            var exception = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
-
-            if (exception is null)
-            {
-                context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-                await context.Response.WriteAsJsonAsync(new { error = "Unknown error" });
-                return;
-            }
+            var exception = context.Features
+                .Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
 
             var statusCode = StatusCodes.Status500InternalServerError;
+            var errorCode = "INTERNAL_SERVER_ERROR";
             var errorMessage = "An unexpected error occurred.";
 
-            switch (exception)
+            if (exception is UnauthorizedAccessException)
             {
-                case UnauthorizedAccessException:
-                    statusCode = StatusCodes.Status401Unauthorized;
-                    errorMessage = "Unauthorized.";
-                    break;
-
-                case InvalidOperationException:
-                    statusCode = StatusCodes.Status400BadRequest;
-                    errorMessage = exception.Message;
-                    break;
-
-                case ArgumentException:
-                    statusCode = StatusCodes.Status400BadRequest;
-                    errorMessage = exception.Message;
-                    break;
+                statusCode = StatusCodes.Status401Unauthorized;
+                errorCode = "UNAUTHORIZED";
+                errorMessage = "Unauthorized.";
+            }
+            else if (exception is ArgumentException or InvalidOperationException)
+            {
+                statusCode = StatusCodes.Status400BadRequest;
+                errorCode = "BAD_REQUEST";
+                errorMessage = exception.Message;
             }
 
-            Log.Error(exception, $"Unhandled exception occurred during request execution. StatusCode: {statusCode}");
+            Log.Error(exception, "Unhandled exception");
 
             context.Response.StatusCode = statusCode;
 
-            await context.Response.WriteAsJsonAsync(new
-            {
-                error = "An unexpected error occurred.",
-                details = exception?.Message
-            });
+            await context.Response.WriteAsJsonAsync(new 
+                ApiResponse<object>(
+                false, 
+                null, 
+                new ApiError(errorCode, errorMessage, exception?.Message))
+            );
         });
     });
 
-    if (!app.Environment.IsDevelopment())
+
+    if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Docker"))
     {
         app.UseHttpsRedirection();
     }
@@ -169,17 +163,15 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
 
-    // Map endpoints
-    app.MapHealthEndpoints();
-    app.MapAuthEndpoints();
-    app.MapTaskEndpoints();
+    // API v1 group
+    var v1 = app.MapGroup("/api/v1");
 
-    app.MapFallback(() =>
-        Results.NotFound(new
-        {
-            error = "Route not found"
-        })
-    );
+    // Map endpoints: Versioned endpoints
+    v1.MapHealthEndpoints();
+    v1.MapAuthEndpoints();
+    v1.MapTaskEndpoints();
+
+    app.MapFallback(() => ApiResults.NotFound("ROUTE_NOT_FOUND", "The requested endpoint does not exist."));
 
     app.Lifetime.ApplicationStarted.Register(() =>
     {
