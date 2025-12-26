@@ -8,16 +8,17 @@ This project is built to demonstrate how a **real-world backend service** is des
 structured, and productionized using modern backend engineering practices.
 
 The goal is not just CRUD functionality, but to show:
-•	clean architecture
-•	separation of concerns
-•	scalable API design
-•	authentication & authorization
-•	validation
-•	rate limiting
-•	pagination & sorting
-•	caching
-•	containerization
-•	production-readiness
+-	clean architecture
+-	separation of concerns
+-	scalable API design
+-	authentication & authorization
+-	validation
+-	rate limiting
+-	pagination & sorting
+-	caching
+-	containerization
+-	production-readiness
+
 It simulates how a **task management microservice** would be implemented in a real backend system.
 
 ---
