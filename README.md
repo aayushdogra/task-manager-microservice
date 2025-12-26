@@ -1,7 +1,26 @@
-# Task Manager Microservice (Minimal API — .NET 10)
+# Task Manager Microservice (Minimal API - .NET 10)
 
 A production-style **Task Manager microservice** built using **.NET 10 Minimal APIs**, PostgreSQL, EF Core, 
 FluentValidation, Serilog, and clean architectural practices.  
+
+## Why this project?
+This project is built to demonstrate how a **real-world backend service** is designed, 
+structured, and productionized using modern backend engineering practices.
+
+The goal is not just CRUD functionality, but to show:
+•	clean architecture
+•	separation of concerns
+•	scalable API design
+•	authentication & authorization
+•	validation
+•	rate limiting
+•	pagination & sorting
+•	caching
+•	containerization
+•	production-readiness
+It simulates how a **task management microservice** would be implemented in a real backend system.
+
+---
 
 This project demonstrates:
 
@@ -60,6 +79,8 @@ retaining structure and clarity.
 - `/Data` — EF Core DbContext + SQL schema 
 - `/logs` — Serilog rolling log files
 
+---
+
 ### DTO-based API contracts
 
 All endpoints use DTOs for clean separation between database models and public API responses 
@@ -80,6 +101,8 @@ All responses are wrapped in a consistent API envelope:
 }
 
 ```
+
+---
 
 ### Request Validation (FluentValidation)
 
@@ -103,6 +126,8 @@ Auth Validation Rules
 
 Validation is executed explicitly in Minimal API endpoints via dependency injection.
 
+---
+
 ### PostgreSQL-backed persistence (EF Core)
 
 - Real database-backed CRUD via `DbTaskService` 
@@ -111,6 +136,8 @@ Validation is executed explicitly in Minimal API endpoints via dependency inject
 - Fully persistent task creation, updates, and deletions
 - Tracks `CreatedAt` and `UpdatedAt` timestamps
 - User-scoped task isolation enforced at query level
+
+---
 
 ### Sorting, Filtering, and Pagination
 Supported features:
@@ -127,6 +154,8 @@ Supported features:
 All logic is handled entirely in the **service layer**, keeping endpoints thin and focused on HTTP concerns only.
 Pagination navigation links are exposed via standard `HTTP Link headers (self, next, prev)`.
 
+---
+
 ### Redis Caching (Read Path Optimization)
 Redis is used to optimize read-heavy task queries using a cache-aside strategy.
 
@@ -139,6 +168,8 @@ Redis is used to optimize read-heavy task queries using a cache-aside strategy.
 - Caching is treated as an **implementation detail**, not part of the service contract
 
 Cache key format: `tasks:{userId}:{queryHash}`
+
+---
 
 ### Cache Invalidation (Write Path)
 To ensure consistency between cache and database:
@@ -157,6 +188,8 @@ Cache behavior is exposed via HTTP response headers:
 
 `X-Cache: HIT | MISS`
 
+---
+
 ### JWT Authentication
 
 Stateless JWT authentication is implemented to support user registration and login.
@@ -166,6 +199,8 @@ Stateless JWT authentication is implemented to support user registration and log
 - Password hashing using `PasswordHasher<T>`
 - JWT generation using `HS256`
 - Token claims include `nameidentifier (UserId)`, `email`, `jti`, and `expiration`
+
+---
 
 ### Refresh Tokens
 
@@ -177,6 +212,8 @@ Database-backed refresh tokens are implemented to support long-lived authenticat
 - Access tokens remain stateless and short-lived
 - Invalid, expired, or revoked refresh tokens return `401 Unauthorized`
 
+---
+
 ### Current User Endpoint (`/me`)
 
 A dedicated endpoint is provided to fetch the currently authenticated user’s profile information.
@@ -185,10 +222,14 @@ A dedicated endpoint is provided to fetch the currently authenticated user’s p
 - Data fetched from DB to ensure consistency
 - Protected via `.RequireAuthorization()`
 
+---
+
 ### Logout Semantics
 - `POST /auth/logout` revokes refresh tokens
 - Access tokens remain valid until expiry
 - Logout is idempotent (safe to call multiple times)
+
+---
 
 ### Authorization (API Protection)
 Authorization is enforced at endpoint level using Minimal API metadata.
@@ -205,6 +246,8 @@ Authorization is enforced at endpoint level using Minimal API metadata.
 - `POST /auth/login`
 - `POST /auth/refresh`
 
+---
+
 ### Rate Limiting & Abuse Protection
 
 - In-memory fixed window rate limiting
@@ -217,6 +260,8 @@ Authorization is enforced at endpoint level using Minimal API metadata.
     - `X-RateLimit-Limit`
     - `X-RateLimit-Remaining`
 
+---
+
 ### Health monitoring & Debugging
 
 - `/health` service liveness 
@@ -226,12 +271,16 @@ Authorization is enforced at endpoint level using Minimal API metadata.
 - `/db-test-task` inserts test task
 - `/debug/tasks?take=N` — fetch top N sorted tasks
 
+---
+
 ### Structured Logging (Serilog)
 
 - Centralized logging using Serilog  
 - Console + rolling file logs (`logs/log-*.txt`)  
 - Environment-based configuration
 - Safe production logging defaults
+
+---
 
 ### Global Exception Handling
 
